@@ -1,0 +1,210 @@
+From Coq Require Import Arith Bool List.
+From Giskard Require Import structures local.
+From RecordUpdate Require Import RecordSet.
+
+Import ListNotations.
+Import RecordSetNotations.
+
+Set Implicit Arguments.
+
+(* BEGIN BOILERPLATE *)
+
+#[export] Instance message_Settable : Settable _ :=
+  settable! mkMessage <get_message_type;get_view;get_sender;get_block;get_piggyback_block>.
+
+#[export] Instance NState_Settable : Settable _ :=
+  settable! mkNState <node_view;node_id;in_messages;counting_messages;out_messages;timeout>.
+
+(* END BOILERPLATE *)
+
+(* BEGIN STATE FUNCTIONS *)
+
+Definition record_set (s : NState) (m : message) : NState :=
+ s <| out_messages := m :: s.(out_messages) |>.
+
+Definition record_plural_set (s : NState) (lm : list message) : NState :=
+ s <| out_messages := lm ++ s.(out_messages) |>.
+
+Definition add_set (s : NState) (m : message) : NState :=
+ s <| in_messages := m :: s.(in_messages) |>.
+
+Definition add_plural_set (s : NState) (lm : list message) : NState :=
+ s <| in_messages := lm ++ s.(in_messages) |>.
+
+Definition discard_set (s : NState) (m : message) : NState :=
+ s <| in_messages := remove message_eq_dec m s.(in_messages) |>.
+
+Definition process_set (s : NState) (msg : message) : NState :=
+ s <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+   <| counting_messages := msg :: s.(counting_messages) |>.
+
+Definition increment_view_set (s : NState) : NState :=
+ s <| node_view := S (node_view s) |>
+   <| in_messages := [] |>
+   <| timeout := false |>.
+
+Definition flip_timeout_set (s : NState) : NState :=
+ s <| timeout := true |>.
+
+Definition propose_block_init_set (s : NState) (msg : message)
+ : NState * list message :=
+ let lm := make_PrepareBlocks s (GenesisBlock_message s) in
+ (record_plural_set s lm, lm).
+
+Definition process_timeout_set (s : NState) (msg : message)
+ : NState * list message :=
+ let lm := [make_ViewChange s; highest_prepare_block_message s] in
+ (record_plural_set s lm, lm).
+
+Definition discard_view_invalid_set (s : NState) (msg : message)
+ : NState * list message :=
+ (discard_set s msg, []).
+
+Definition process_PrepareBlock_duplicate_set (s : NState) (msg : message)
+ : NState * list message :=
+ (discard_set s msg, []).
+
+Definition process_PrepareBlock_pending_vote_set (s : NState) (msg : message)
+ : NState * list message :=
+ (process_set s msg, []).
+
+Definition process_PrepareBlock_vote_set (s : NState) (msg : message)
+ : NState * list message :=
+ (record_plural_set (process_set s msg) (pending_PrepareVote s msg), []).
+
+Definition process_PrepareVote_wait_set (s : NState) (msg : message)
+ : NState * list message :=
+ (process_set s msg, []).
+
+Definition process_PrepareVote_vote_set (s : NState) (msg : message)
+ : NState * list message :=
+ let lm := make_PrepareQC s msg :: pending_PrepareVote s msg in
+ (process_set (record_plural_set s lm) msg, lm).
+
+Definition process_PrepareQC_last_block_new_proposer_set (s : NState) (msg : message)
+ : NState * list message :=
+ let lm := make_PrepareBlocks (increment_view (process_set s msg)) msg in
+ (record_plural_set (increment_view_set (process_set s msg)) lm, lm).
+
+Definition process_PrepareQC_last_block_set (s : NState) (msg : message)
+ : NState * list message :=
+ (increment_view_set (process_set s msg), []).
+
+Definition process_PrepareQC_non_last_block_set (s : NState) (msg : message)
+ : NState * list message :=
+ let lm := pending_PrepareVote s msg in
+ (process_set (record_plural_set s lm) msg, lm).
+
+Definition process_ViewChange_quorum_new_proposer_set (s : NState) (msg : message)
+ : NState * list message :=
+ let lm := 
+   mkMessage PrepareQC (node_view s) (node_id s)
+    (get_block (highest_ViewChange_message (process_set s msg))) GenesisBlock ::
+    make_ViewChangeQC s (highest_ViewChange_message (process_set s msg)) ::
+    make_PrepareBlocks (increment_view s) (highest_ViewChange_message (process_set s msg)) in
+ (record_plural_set (increment_view_set (process_set (process_set s msg)
+   (mkMessage PrepareQC (get_view msg) (get_sender msg)
+    (get_block (highest_ViewChange_message (process_set s msg))) GenesisBlock))) lm, lm).
+
+Definition process_ViewChange_pre_quorum_set (s : NState) (msg : message)
+ : NState * list message :=
+ (process_set s msg, []).
+
+Definition process_ViewChangeQC_single_set (s : NState) (msg : message)
+ : NState * list message :=
+ (increment_view_set (process_set (process_set s
+   (mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock)) msg), []).
+
+Definition malicious_ignore_set (s : NState) (msg : message)
+ : NState * list message :=
+ (discard_set s msg, []).
+
+Definition process_PrepareBlock_malicious_vote (s : NState) (msg : message)
+ : NState * list message :=
+ let lm := pending_PrepareVote s msg in
+ (record_plural_set (process_set s msg) lm, lm).
+
+(* END STATE FUNCTIONS *)
+
+(* BEGIN REFINEMENT PROOFS *)
+
+Lemma record_set_eq : forall s m,
+ record s m = record_set s m.
+Proof. reflexivity. Qed.
+
+Lemma record_plural_set_eq : forall s lm,
+ record_plural s lm = record_plural_set s lm.
+Proof. reflexivity. Qed.
+
+Lemma add_set_eq : forall s m,
+ add s m = add_set s m.
+Proof. reflexivity. Qed.
+
+Lemma add_plural_set_eq : forall s lm,
+ add_plural s lm = add_plural_set s lm.
+Proof. reflexivity. Qed.
+
+Lemma discard_set_eq : forall s m,
+ discard s m = discard_set s m.
+Proof. reflexivity. Qed.
+
+Lemma process_set_eq : forall s msg,
+ process s msg = process_set s msg.
+Proof. reflexivity. Qed.
+
+Lemma increment_view_set_eq : forall s,
+ increment_view s = increment_view_set s.
+Proof. reflexivity. Qed.
+
+Lemma flip_timeout_set_eq : forall s,
+ flip_timeout s = flip_timeout_set s.
+Proof. reflexivity. Qed.
+
+Lemma propose_block_init_set_eq : forall s msg s' lm,
+ s = NState_init s.(node_id) ->
+ s.(timeout) = false ->
+ is_block_proposer s.(node_id) 0 ->
+ honest_node s.(node_id) ->
+ propose_block_init_set s msg = (s',lm) <-> propose_block_init s msg s' lm.
+Proof.
+unfold propose_block_init, propose_block_init_set.
+split.
+- intros Heq; inversion Heq; subst; tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  destruct Heq'' as [Heq'' Heq'''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_timeout_set_eq : forall s msg s' lm,
+ honest_node (node_id s) ->
+ timeout s = true ->
+ process_timeout_set s msg = (s',lm) <-> process_timeout s msg s' lm.
+Proof.
+unfold process_timeout, process_timeout_set.
+split.
+- intros Heq; inversion Heq; subst; tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  destruct Heq'' as [Heq'' Heq'''].
+  subst; reflexivity.
+Qed.
+
+Lemma discard_view_invalid_set_eq : forall s msg s' lm,
+ ~ view_valid s msg ->
+ received s msg ->
+ honest_node (node_id s) ->
+ discard_view_invalid_set s msg = (s',lm) <-> discard_view_invalid s msg s' lm.
+Proof.
+unfold discard_view_invalid, discard_view_invalid_set.
+split.
+- intros Heq; inversion Heq; subst; tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+(* END REFINEMENT PROOFS *)

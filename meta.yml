@@ -33,7 +33,14 @@ supported_coq_versions:
   text: 8.10 or later
   opam: '{>= "8.10"}'
 
+dependencies:
+- opam:
+    name: coq-record-update
+  description: |-
+    [Coq record update library](https://github.com/tchajed/coq-record-update)
+
 tested_coq_opam_versions:
+- version: '8.17'
 - version: '8.16'
 - version: '8.15'
 - version: '8.14'
@@ -55,11 +62,13 @@ categories:
 build: |-
   ## Building instructions
 
-  We recommend installing Coq 8.16 via [OPAM](http://opam.ocaml.org/doc/Install.html):
+  We recommend installing Coq 8.16 and other dependencies
+  via [opam](http://opam.ocaml.org/doc/Install.html):
   ```shell
-  opam install coq.8.16.0
+  opam install coq.8.16.1 coq-record-update
   ```
-  When Coq is installed, use the following commands to obtain and build the project:
+  When Coq and other dependencies are installed, use the following commands
+  to obtain and build the project:
   ```shell
   git clone https://github.com/runtimeverification/giskard-verification.git
   cd giskard-verification

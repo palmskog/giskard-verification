@@ -16,15 +16,19 @@ proves several key safety properties of the protocol.
 
 - License: [University of Illinois/NCSA Open Source License](LICENSE.md)
 - Compatible Coq versions: 8.10 or later
+- Additional dependencies:
+  - [Coq record update library](https://github.com/tchajed/coq-record-update)
 - Coq namespace: `Giskard`
 
 ## Building instructions
 
-We recommend installing Coq 8.16 via [OPAM](http://opam.ocaml.org/doc/Install.html):
+We recommend installing Coq 8.16 and other dependencies
+via [opam](http://opam.ocaml.org/doc/Install.html):
 ```shell
-opam install coq.8.16.0
+opam install coq.8.16.1 coq-record-update
 ```
-When Coq is installed, use the following commands to obtain and build the project:
+When Coq and other dependencies are installed, use the following commands
+to obtain and build the project:
 ```shell
 git clone https://github.com/runtimeverification/giskard-verification.git
 cd giskard-verification
