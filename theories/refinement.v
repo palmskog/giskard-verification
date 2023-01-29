@@ -129,7 +129,11 @@ Definition process_PrepareQC_last_block_set (s : NState) (msg : message)
 Definition process_PrepareQC_non_last_block_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := pending_PrepareVote s msg in
- (process_set (record_plural_set s lm) msg, lm).
+ let s' := s
+   <| out_messages := lm ++ s.(out_messages) |>
+   <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+   <| counting_messages := msg :: s.(counting_messages) |>
+ in (s', lm).
 
 Definition process_ViewChange_quorum_new_proposer_set (s : NState) (msg : message)
  : NState * list message :=
@@ -141,6 +145,19 @@ Definition process_ViewChange_quorum_new_proposer_set (s : NState) (msg : messag
  (record_plural_set (increment_view_set (process_set (process_set s msg)
    (mkMessage PrepareQC (get_view msg) (get_sender msg)
     (get_block (highest_ViewChange_message (process_set s msg))) GenesisBlock))) lm, lm).
+(*
+ let msg' := mkMessage PrepareQC (node_view s) (node_id s)
+  (get_block (highest_ViewChange_message s)) GenesisBlock in
+ let lm := msg' :: make_ViewChangeQC s (highest_ViewChange_message s) ::
+   make_PrepareBlocks (increment_view s) (highest_ViewChange_message s) in
+ let s' := s
+  <| counting_messages := msg' :: msg :: s.(counting_messages) |>
+  <| node_view := S (node_view s) |>
+  <| in_messages := [] |>
+  <| timeout := false |>
+  <| out_messages := lm |>
+ in (s', lm).
+*)
 
 Definition process_ViewChange_pre_quorum_set (s : NState) (msg : message)
  : NState * list message :=
@@ -375,6 +392,48 @@ Lemma process_PrepareQC_last_block_set_eq : forall s msg s' lm,
  process_PrepareQC_last_block s msg s' lm.
 Proof.
 unfold process_PrepareQC_last_block_set,process_PrepareQC_last_block.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareQC_non_last_block_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = PrepareQC ->
+ view_valid s msg ->
+ timeout s = false ->
+ ~ last_block (get_block msg) ->
+ process_PrepareQC_non_last_block_set s msg = (s', lm) <->
+ process_PrepareQC_non_last_block s msg s' lm.
+Proof.
+unfold process_PrepareQC_non_last_block_set,process_PrepareQC_non_last_block.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_ViewChange_quorum_new_proposer_set_eq : forall s msg s' lm,
+ received s msg ->
+ received s (mkMessage PrepareQC (get_view msg) (get_sender msg)
+  (get_block (highest_ViewChange_message (process s msg))) GenesisBlock) ->
+ honest_node (node_id s) ->
+ get_message_type msg = ViewChange ->
+ view_valid s msg ->
+ view_change_quorum_in_view (process s msg) (node_view s) ->
+ is_block_proposer (node_id s) (S (node_view s)) ->
+ process_ViewChange_quorum_new_proposer_set s msg = (s', lm) <->
+ process_ViewChange_quorum_new_proposer s msg s' lm.
+Proof.
+unfold process_ViewChange_quorum_new_proposer_set,process_ViewChange_quorum_new_proposer,highest_ViewChange_message.
 split.
 - intros Heq; inversion Heq; subst.
   tauto.
