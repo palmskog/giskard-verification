@@ -207,4 +207,25 @@ split.
   subst; reflexivity.
 Qed.
 
+Lemma process_PrepareBlock_duplicate_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = PrepareBlock ->
+ view_valid s msg ->
+ timeout s = false ->
+ exists_same_height_PrepareBlock s (get_block msg) ->
+ process_PrepareBlock_duplicate_set s msg = (s',lm) <->
+ process_PrepareBlock_duplicate s msg s' lm.
+Proof.
+unfold process_PrepareBlock_duplicate, process_PrepareBlock_duplicate_set.
+split.
+- intros Heq; inversion Heq; subst.
+  rewrite <- discard_set_eq.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
 (* END REFINEMENT PROOFS *)

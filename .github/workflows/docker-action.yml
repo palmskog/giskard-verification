@@ -3,7 +3,7 @@ name: Docker CI
 on:
   push:
     branches:
-      - master
+      - kth
   pull_request:
     branches:
       - '**'
