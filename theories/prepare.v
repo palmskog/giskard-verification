@@ -392,13 +392,13 @@ Proof.
       * clear IH_prot.
         now apply pre_local_evidence_of_equivocation_middle_case with tr n i msg1 msg2.  
     + destruct (In_dec message_eq_dec msg1 (counting_messages (fst (tr i) n))) as [H_old1 | H_new1].
-      * apply pre_local_evidence_of_equivocation_middle_case with tr n i msg2 msg1; try assumption; try easy.
-        intro H_eq. symmetry in H_eq. contradiction.
+      * apply pre_local_evidence_of_equivocation_middle_case with tr n i msg2 msg1;
+         try assumption; try easy; try (intro H_eq; symmetry in H_eq; contradiction).
       * clear IH_prot.
-        now apply pre_local_evidence_of_equivocation_last_case with tr n i msg1 msg2. 
+        now apply pre_local_evidence_of_equivocation_last_case with tr n i msg1 msg2.
 Qed.
 
-(** And therefore, we can prove dishonesty from equivocation by weakning the premise: *) 
+(** And therefore, we can prove dishonesty from equivocation by weakening the premise: *)
 Lemma local_evidence_of_equivocation :
   forall (tr : GTrace),
     protocol_trace tr ->
