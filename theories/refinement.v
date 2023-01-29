@@ -17,7 +17,7 @@ Set Implicit Arguments.
 
 (* END BOILERPLATE *)
 
-(* BEGIN STATE FUNCTIONS *)
+(* BEGIN BASIC STATE FUNCTIONS *)
 
 Definition record_set (s : NState) (m : message) : NState :=
  s <| out_messages := m :: s.(out_messages) |>.
@@ -46,49 +46,85 @@ Definition increment_view_set (s : NState) : NState :=
 Definition flip_timeout_set (s : NState) : NState :=
  s <| timeout := true |>.
 
+(* END BASIC STATE FUNCTIONS *)
+
+(* BEGIN STATE UPDATE FUNCTIONS *)
+
 Definition propose_block_init_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := make_PrepareBlocks s (GenesisBlock_message s) in
- (record_plural_set s lm, lm).
+ let s' := s <| out_messages := lm ++ s.(out_messages) |> in
+ (s', lm).
 
 Definition process_timeout_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := [make_ViewChange s; highest_prepare_block_message s] in
- (record_plural_set s lm, lm).
+ let s' := s <| out_messages := lm ++ s.(out_messages) |> in
+ (s', lm).
 
 Definition discard_view_invalid_set (s : NState) (msg : message)
  : NState * list message :=
- (discard_set s msg, []).
+ let s' := s <| in_messages := remove message_eq_dec msg s.(in_messages) |> in
+ (s', []).
 
 Definition process_PrepareBlock_duplicate_set (s : NState) (msg : message)
  : NState * list message :=
- (discard_set s msg, []).
+ let s' := s <| in_messages := remove message_eq_dec msg s.(in_messages) |> in
+ (s', []).
 
 Definition process_PrepareBlock_pending_vote_set (s : NState) (msg : message)
  : NState * list message :=
- (process_set s msg, []).
+ let s' := s
+  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+  <| counting_messages := msg :: s.(counting_messages) |>
+ in (s', []).
 
 Definition process_PrepareBlock_vote_set (s : NState) (msg : message)
  : NState * list message :=
- (record_plural_set (process_set s msg) (pending_PrepareVote s msg), []).
+ let lm := pending_PrepareVote s msg in
+ let s' := s
+   <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+   <| counting_messages := msg :: s.(counting_messages) |>
+   <| out_messages := lm ++ s.(out_messages) |>
+ in (s', lm).
 
 Definition process_PrepareVote_wait_set (s : NState) (msg : message)
  : NState * list message :=
- (process_set s msg, []).
+ let s' := s
+  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+  <| counting_messages := msg :: s.(counting_messages) |>
+ in (s', []).
 
 Definition process_PrepareVote_vote_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := make_PrepareQC s msg :: pending_PrepareVote s msg in
- (process_set (record_plural_set s lm) msg, lm).
+ let s' := s
+  <| out_messages := lm ++ s.(out_messages) |>
+  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+  <| counting_messages := msg :: s.(counting_messages) |>
+ in (s', lm).
 
 Definition process_PrepareQC_last_block_new_proposer_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := make_PrepareBlocks (increment_view (process_set s msg)) msg in
- (record_plural_set (increment_view_set (process_set s msg)) lm, lm).
+ let s' := s
+  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+  <| counting_messages := msg :: s.(counting_messages) |>
+  <| node_view := S (node_view s) |>
+  <| in_messages := [] |>
+  <| timeout := false |>
+  <| out_messages := lm ++ s.(out_messages) |>
+ in (s', lm).
 
 Definition process_PrepareQC_last_block_set (s : NState) (msg : message)
  : NState * list message :=
- (increment_view_set (process_set s msg), []).
+ let s' := s
+   <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+   <| counting_messages := msg :: s.(counting_messages) |>
+   <| node_view := S (node_view s) |>
+   <| in_messages := [] |>
+   <| timeout := false |>
+ in (s', []).
 
 Definition process_PrepareQC_non_last_block_set (s : NState) (msg : message)
  : NState * list message :=
@@ -124,7 +160,7 @@ Definition process_PrepareBlock_malicious_vote (s : NState) (msg : message)
  let lm := pending_PrepareVote s msg in
  (record_plural_set (process_set s msg) lm, lm).
 
-(* END STATE FUNCTIONS *)
+(* END STATE UPDATE FUNCTIONS *)
 
 (* BEGIN REFINEMENT PROOFS *)
 
@@ -220,7 +256,127 @@ Proof.
 unfold process_PrepareBlock_duplicate, process_PrepareBlock_duplicate_set.
 split.
 - intros Heq; inversion Heq; subst.
-  rewrite <- discard_set_eq.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareBlock_pending_vote_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = PrepareBlock ->
+ view_valid s msg ->
+ timeout s = false ->
+ ~ exists_same_height_PrepareBlock s (get_block msg) ->
+ ~ prepare_stage s (parent_of (get_block msg)) ->
+ process_PrepareBlock_pending_vote_set s msg = (s', lm) <->
+ process_PrepareBlock_pending_vote s msg s' lm.
+Proof.
+unfold process_PrepareBlock_pending_vote, process_PrepareBlock_pending_vote_set.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareBlock_vote_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = PrepareBlock ->
+ view_valid s msg ->
+ timeout s = false ->
+ prepare_stage s (parent_of (get_block msg)) ->
+ process_PrepareBlock_vote_set s msg = (s', lm) <->
+ process_PrepareBlock_vote s msg s' lm.
+Proof.
+unfold process_PrepareBlock_vote, process_PrepareBlock_vote_set.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareVote_wait_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node s.(node_id) ->
+ get_message_type msg = PrepareVote ->
+ view_valid s msg ->
+ timeout s = false ->
+ ~ prepare_stage (process s msg) (get_block msg) ->
+ process_PrepareVote_wait_set s msg = (s', lm) <->
+ process_PrepareVote_wait s msg s' lm.
+Proof.
+unfold process_PrepareVote_wait, process_PrepareVote_wait_set.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareVote_vote_set_eq : forall s msg s' lm,
+ honest_node (node_id s) ->
+ received s msg ->
+ get_message_type msg = PrepareVote ->
+ view_valid s msg ->
+ timeout s = false ->
+ ~ exists_same_height_block s (get_block msg) ->
+ vote_quorum_in_view (process s msg) (get_view msg) (get_block msg) ->
+ process_PrepareVote_vote_set s msg = (s', lm) <->
+ process_PrepareVote_vote s msg s' lm.
+Proof.
+unfold process_PrepareVote_vote, process_PrepareVote_vote_set.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareQC_last_block_new_proposer_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = PrepareQC ->
+ view_valid s msg ->
+ last_block (get_block msg) /\ is_block_proposer (node_id s) (S (node_view s)) ->
+ process_PrepareQC_last_block_new_proposer_set s msg = (s', lm) <->
+ process_PrepareQC_last_block_new_proposer s msg s' lm.
+Proof.
+unfold process_PrepareQC_last_block_new_proposer_set,process_PrepareQC_last_block_new_proposer.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareQC_last_block_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = PrepareQC ->
+ view_valid s msg ->
+ last_block (get_block msg) ->
+ ~ is_block_proposer (node_id s) (S (node_view s)) ->
+ process_PrepareQC_last_block_set s msg = (s', lm) <->
+ process_PrepareQC_last_block s msg s' lm.
+Proof.
+unfold process_PrepareQC_last_block_set,process_PrepareQC_last_block.
+split.
+- intros Heq; inversion Heq; subst.
   tauto.
 - intros Heq.
   destruct Heq as [Heq Heq'].

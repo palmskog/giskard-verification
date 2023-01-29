@@ -15,7 +15,7 @@ proves several key safety properties of the protocol.
 ## Meta
 
 - License: [University of Illinois/NCSA Open Source License](LICENSE.md)
-- Compatible Coq versions: 8.10 or later
+- Compatible Coq versions: 8.14 or later
 - Additional dependencies:
   - [Coq record update library](https://github.com/tchajed/coq-record-update)
 - Coq namespace: `Giskard`
