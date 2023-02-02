@@ -161,12 +161,22 @@ Definition process_ViewChange_quorum_new_proposer_set (s : NState) (msg : messag
 
 Definition process_ViewChange_pre_quorum_set (s : NState) (msg : message)
  : NState * list message :=
- (process_set s msg, []).
+ let s' := s
+  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+  <| counting_messages := msg :: s.(counting_messages) |>
+ in (s', []).
 
 Definition process_ViewChangeQC_single_set (s : NState) (msg : message)
  : NState * list message :=
- (increment_view_set (process_set (process_set s
-   (mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock)) msg), []).
+ let msg' :=
+   mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock
+ in
+ let s' := s
+  <| counting_messages := msg :: msg' :: s.(counting_messages) |>
+  <| node_view := S (node_view s) |>
+  <| in_messages := [] |>
+  <| timeout := false |>
+ in (s', []).
 
 Definition malicious_ignore_set (s : NState) (msg : message)
  : NState * list message :=
@@ -434,6 +444,44 @@ Lemma process_ViewChange_quorum_new_proposer_set_eq : forall s msg s' lm,
   process_ViewChange_quorum_new_proposer s msg s' lm).
 Proof.
 unfold process_ViewChange_quorum_new_proposer_set,process_ViewChange_quorum_new_proposer.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_ViewChange_pre_quorum_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = ViewChange ->
+ view_valid s msg -> 
+ ~ view_change_quorum_in_view (process s msg) (node_view s) ->
+ (process_ViewChange_pre_quorum_set s msg = (s',lm) <->
+  process_ViewChange_pre_quorum s msg s' lm).
+Proof.
+unfold process_ViewChange_pre_quorum_set,process_ViewChange_pre_quorum.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_ViewChangeQC_single_set_eq : forall s msg s' lm,
+ received s msg ->
+ received s (mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock) ->
+ honest_node (node_id s) ->
+ get_message_type msg = ViewChangeQC ->
+ view_valid s msg ->
+ (process_ViewChangeQC_single_set s msg = (s',lm) <->
+   process_ViewChangeQC_single s msg s' lm).
+Proof.
+unfold process_ViewChangeQC_single_set,process_ViewChangeQC_single.
 split.
 - intros Heq; inversion Heq; subst.
   tauto.
