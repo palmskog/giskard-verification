@@ -137,27 +137,27 @@ Definition process_PrepareQC_non_last_block_set (s : NState) (msg : message)
 
 Definition process_ViewChange_quorum_new_proposer_set (s : NState) (msg : message)
  : NState * list message :=
- let lm := 
-   mkMessage PrepareQC (node_view s) (node_id s)
-    (get_block (highest_ViewChange_message (process_set s msg))) GenesisBlock ::
-    make_ViewChangeQC s (highest_ViewChange_message (process_set s msg)) ::
-    make_PrepareBlocks (increment_view s) (highest_ViewChange_message (process_set s msg)) in
- (record_plural_set (increment_view_set (process_set (process_set s msg)
-   (mkMessage PrepareQC (get_view msg) (get_sender msg)
-    (get_block (highest_ViewChange_message (process_set s msg))) GenesisBlock))) lm, lm).
-(*
- let msg' := mkMessage PrepareQC (node_view s) (node_id s)
-  (get_block (highest_ViewChange_message s)) GenesisBlock in
- let lm := msg' :: make_ViewChangeQC s (highest_ViewChange_message s) ::
-   make_PrepareBlocks (increment_view s) (highest_ViewChange_message s) in
  let s' := s
-  <| counting_messages := msg' :: msg :: s.(counting_messages) |>
-  <| node_view := S (node_view s) |>
-  <| in_messages := [] |>
-  <| timeout := false |>
-  <| out_messages := lm |>
- in (s', lm).
-*)
+   <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+   <| counting_messages := msg :: s.(counting_messages) |>
+ in
+ let msg_vc :=
+   highest_ViewChange_message s'
+ in
+ let lm :=
+   mkMessage PrepareQC (node_view s) (node_id s) (get_block msg_vc) GenesisBlock ::
+     make_ViewChangeQC s msg_vc :: make_PrepareBlocks (increment_view s) msg_vc
+ in
+ let msg_pr :=
+   mkMessage PrepareQC (get_view msg) (get_sender msg) (get_block msg_vc) GenesisBlock
+ in
+ let s'' := s'
+   <| counting_messages := msg_pr :: s'.(counting_messages) |>
+   <| node_view := S (node_view s') |>
+   <| in_messages := [] |>
+   <| timeout := false |>
+   <| out_messages := lm ++ s'.(out_messages) |>
+ in (s'', lm).
 
 Definition process_ViewChange_pre_quorum_set (s : NState) (msg : message)
  : NState * list message :=
@@ -218,7 +218,7 @@ Lemma propose_block_init_set_eq : forall s msg s' lm,
  s.(timeout) = false ->
  is_block_proposer s.(node_id) 0 ->
  honest_node s.(node_id) ->
- propose_block_init_set s msg = (s',lm) <-> propose_block_init s msg s' lm.
+ (propose_block_init_set s msg = (s',lm) <-> propose_block_init s msg s' lm).
 Proof.
 unfold propose_block_init, propose_block_init_set.
 split.
@@ -233,7 +233,7 @@ Qed.
 Lemma process_timeout_set_eq : forall s msg s' lm,
  honest_node (node_id s) ->
  timeout s = true ->
- process_timeout_set s msg = (s',lm) <-> process_timeout s msg s' lm.
+ (process_timeout_set s msg = (s',lm) <-> process_timeout s msg s' lm).
 Proof.
 unfold process_timeout, process_timeout_set.
 split.
@@ -249,7 +249,7 @@ Lemma discard_view_invalid_set_eq : forall s msg s' lm,
  ~ view_valid s msg ->
  received s msg ->
  honest_node (node_id s) ->
- discard_view_invalid_set s msg = (s',lm) <-> discard_view_invalid s msg s' lm.
+ (discard_view_invalid_set s msg = (s',lm) <-> discard_view_invalid s msg s' lm).
 Proof.
 unfold discard_view_invalid, discard_view_invalid_set.
 split.
@@ -267,8 +267,8 @@ Lemma process_PrepareBlock_duplicate_set_eq : forall s msg s' lm,
  view_valid s msg ->
  timeout s = false ->
  exists_same_height_PrepareBlock s (get_block msg) ->
- process_PrepareBlock_duplicate_set s msg = (s',lm) <->
- process_PrepareBlock_duplicate s msg s' lm.
+ (process_PrepareBlock_duplicate_set s msg = (s',lm) <->
+  process_PrepareBlock_duplicate s msg s' lm).
 Proof.
 unfold process_PrepareBlock_duplicate, process_PrepareBlock_duplicate_set.
 split.
@@ -288,8 +288,8 @@ Lemma process_PrepareBlock_pending_vote_set_eq : forall s msg s' lm,
  timeout s = false ->
  ~ exists_same_height_PrepareBlock s (get_block msg) ->
  ~ prepare_stage s (parent_of (get_block msg)) ->
- process_PrepareBlock_pending_vote_set s msg = (s', lm) <->
- process_PrepareBlock_pending_vote s msg s' lm.
+ (process_PrepareBlock_pending_vote_set s msg = (s', lm) <->
+   process_PrepareBlock_pending_vote s msg s' lm).
 Proof.
 unfold process_PrepareBlock_pending_vote, process_PrepareBlock_pending_vote_set.
 split.
@@ -308,8 +308,8 @@ Lemma process_PrepareBlock_vote_set_eq : forall s msg s' lm,
  view_valid s msg ->
  timeout s = false ->
  prepare_stage s (parent_of (get_block msg)) ->
- process_PrepareBlock_vote_set s msg = (s', lm) <->
- process_PrepareBlock_vote s msg s' lm.
+ (process_PrepareBlock_vote_set s msg = (s', lm) <->
+   process_PrepareBlock_vote s msg s' lm).
 Proof.
 unfold process_PrepareBlock_vote, process_PrepareBlock_vote_set.
 split.
@@ -328,8 +328,8 @@ Lemma process_PrepareVote_wait_set_eq : forall s msg s' lm,
  view_valid s msg ->
  timeout s = false ->
  ~ prepare_stage (process s msg) (get_block msg) ->
- process_PrepareVote_wait_set s msg = (s', lm) <->
- process_PrepareVote_wait s msg s' lm.
+ (process_PrepareVote_wait_set s msg = (s', lm) <->
+   process_PrepareVote_wait s msg s' lm).
 Proof.
 unfold process_PrepareVote_wait, process_PrepareVote_wait_set.
 split.
@@ -349,8 +349,8 @@ Lemma process_PrepareVote_vote_set_eq : forall s msg s' lm,
  timeout s = false ->
  ~ exists_same_height_block s (get_block msg) ->
  vote_quorum_in_view (process s msg) (get_view msg) (get_block msg) ->
- process_PrepareVote_vote_set s msg = (s', lm) <->
- process_PrepareVote_vote s msg s' lm.
+ (process_PrepareVote_vote_set s msg = (s', lm) <->
+   process_PrepareVote_vote s msg s' lm).
 Proof.
 unfold process_PrepareVote_vote, process_PrepareVote_vote_set.
 split.
@@ -368,8 +368,8 @@ Lemma process_PrepareQC_last_block_new_proposer_eq : forall s msg s' lm,
  get_message_type msg = PrepareQC ->
  view_valid s msg ->
  last_block (get_block msg) /\ is_block_proposer (node_id s) (S (node_view s)) ->
- process_PrepareQC_last_block_new_proposer_set s msg = (s', lm) <->
- process_PrepareQC_last_block_new_proposer s msg s' lm.
+ (process_PrepareQC_last_block_new_proposer_set s msg = (s', lm) <->
+   process_PrepareQC_last_block_new_proposer s msg s' lm).
 Proof.
 unfold process_PrepareQC_last_block_new_proposer_set,process_PrepareQC_last_block_new_proposer.
 split.
@@ -388,8 +388,8 @@ Lemma process_PrepareQC_last_block_set_eq : forall s msg s' lm,
  view_valid s msg ->
  last_block (get_block msg) ->
  ~ is_block_proposer (node_id s) (S (node_view s)) ->
- process_PrepareQC_last_block_set s msg = (s', lm) <->
- process_PrepareQC_last_block s msg s' lm.
+ (process_PrepareQC_last_block_set s msg = (s', lm) <->
+  process_PrepareQC_last_block s msg s' lm).
 Proof.
 unfold process_PrepareQC_last_block_set,process_PrepareQC_last_block.
 split.
@@ -408,8 +408,8 @@ Lemma process_PrepareQC_non_last_block_set_eq : forall s msg s' lm,
  view_valid s msg ->
  timeout s = false ->
  ~ last_block (get_block msg) ->
- process_PrepareQC_non_last_block_set s msg = (s', lm) <->
- process_PrepareQC_non_last_block s msg s' lm.
+ (process_PrepareQC_non_last_block_set s msg = (s', lm) <->
+   process_PrepareQC_non_last_block s msg s' lm).
 Proof.
 unfold process_PrepareQC_non_last_block_set,process_PrepareQC_non_last_block.
 split.
@@ -430,10 +430,10 @@ Lemma process_ViewChange_quorum_new_proposer_set_eq : forall s msg s' lm,
  view_valid s msg ->
  view_change_quorum_in_view (process s msg) (node_view s) ->
  is_block_proposer (node_id s) (S (node_view s)) ->
- process_ViewChange_quorum_new_proposer_set s msg = (s', lm) <->
- process_ViewChange_quorum_new_proposer s msg s' lm.
+ (process_ViewChange_quorum_new_proposer_set s msg = (s', lm) <->
+  process_ViewChange_quorum_new_proposer s msg s' lm).
 Proof.
-unfold process_ViewChange_quorum_new_proposer_set,process_ViewChange_quorum_new_proposer,highest_ViewChange_message.
+unfold process_ViewChange_quorum_new_proposer_set,process_ViewChange_quorum_new_proposer.
 split.
 - intros Heq; inversion Heq; subst.
   tauto.
