@@ -180,12 +180,17 @@ Definition process_ViewChangeQC_single_set (s : NState) (msg : message)
 
 Definition malicious_ignore_set (s : NState) (msg : message)
  : NState * list message :=
- (discard_set s msg, []).
+ let s' := s <| in_messages := remove message_eq_dec msg s.(in_messages) |> in
+ (s', []).
 
-Definition process_PrepareBlock_malicious_vote (s : NState) (msg : message)
+Definition process_PrepareBlock_malicious_vote_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := pending_PrepareVote s msg in
- (record_plural_set (process_set s msg) lm, lm).
+ let s' := s
+  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+  <| counting_messages := msg :: s.(counting_messages) |>
+  <| out_messages := lm ++ s.(out_messages) |>
+ in (s', lm).
 
 (* END STATE UPDATE FUNCTIONS *)
 
@@ -482,6 +487,41 @@ Lemma process_ViewChangeQC_single_set_eq : forall s msg s' lm,
    process_ViewChangeQC_single s msg s' lm).
 Proof.
 unfold process_ViewChangeQC_single_set,process_ViewChangeQC_single.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma malicious_ignore_set_eq : forall s msg s' lm,
+ received s msg ->
+ ~ honest_node (node_id s) ->
+ (malicious_ignore_set s msg = (s',lm) <->
+   malicious_ignore s msg s' lm).
+Proof.
+unfold malicious_ignore_set,malicious_ignore.
+split.
+- intros Heq; inversion Heq; subst.
+  tauto.
+- intros Heq.
+  destruct Heq as [Heq Heq'].
+  destruct Heq' as [Heq' Heq''].
+  subst; reflexivity.
+Qed.
+
+Lemma process_PrepareBlock_malicious_vote_set_eq : forall s msg s' lm,
+ received s msg ->
+ ~ honest_node (node_id s) ->
+ get_message_type msg = PrepareBlock ->
+ view_valid s msg ->
+ exists_same_height_block s (get_block msg) ->
+ (process_PrepareBlock_malicious_vote_set s msg = (s',lm) <->
+   process_PrepareBlock_malicious_vote s msg s' lm).
+Proof.
+unfold process_PrepareBlock_malicious_vote_set,process_PrepareBlock_malicious_vote.
 split.
 - intros Heq; inversion Heq; subst.
   tauto.
