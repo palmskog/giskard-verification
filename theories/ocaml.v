@@ -3,16 +3,16 @@ From Coq Require Extraction.
 From Coq Require ExtrOcamlBasic.
 From Coq Require ExtrOcamlNatInt.
 
-Extract Constant block => "'a".
-Extract Constant node => "'a".
+Extract Inlined Constant block => "int".
+Extract Inlined Constant node => "int".
 Extract Constant block_eqb => "(=)".
 Extract Constant node_eqb => "(=)".
 Extract Constant has_at_least_two_thirdsb => "fun _ -> true".
-Extract Constant GenesisBlock => "Obj.magic ()".
+Extract Constant GenesisBlock => "0".
 Extract Constant b_height => "fun _ -> 0".
 Extract Constant parent_ofb => "fun _ _ -> false".
-Extract Constant generate_last_block => "fun _ -> Obj.magic ()".
-Extract Constant generate_new_block => "fun _ -> Obj.magic ()".
+Extract Constant generate_last_block => "fun x -> x + 1".
+Extract Constant generate_new_block => "fun x -> x + 1".
 
 Extraction "giskard.ml"
  propose_block_init_set

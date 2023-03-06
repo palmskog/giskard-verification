@@ -3,16 +3,16 @@ From Coq Require Extraction.
 
 Extraction Language Haskell.
 
-Extract Constant block => "a".
-Extract Constant node => "a".
+Extract Constant block => "Nat".
+Extract Constant node => "Nat".
 Extract Constant block_eqb => "(=)".
 Extract Constant node_eqb => "(=)".
-Extract Constant has_at_least_two_thirdsb => "\ _ -> true".
-Extract Constant GenesisBlock => "undefined".
-Extract Constant b_height => "fun _ -> 0".
-Extract Constant parent_ofb => "fun _ _ -> false".
-Extract Constant generate_last_block => "fun _ -> undefined".
-Extract Constant generate_new_block => "fun _ -> undefined".
+Extract Constant has_at_least_two_thirdsb => "\_ -> true".
+Extract Constant GenesisBlock => "O".
+Extract Constant b_height => "\_ -> 0".
+Extract Constant parent_ofb => "\_ _ -> false".
+Extract Constant generate_last_block => "\x -> S x".
+Extract Constant generate_new_block => "\x -> S x".
 
 Extraction "giskard.hs"
  propose_block_init_set
