@@ -19,3 +19,6 @@ Makefile.coq.conf
 _build
 resources/index.html
 .lia.cache
+giskard.hs
+giskard.ml
+giskard.mli

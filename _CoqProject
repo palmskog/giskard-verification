@@ -8,3 +8,5 @@ theories/prepare.v
 theories/precommit.v
 theories/commit.v
 theories/refinement.v
+theories/ocaml.v
+theories/haskell.v
