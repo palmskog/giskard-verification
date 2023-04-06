@@ -127,7 +127,8 @@ inversion H0; clear H0.
       process_ViewChange_pre_quorum,
       process_ViewChangeQC_single,
       process_PrepareBlock_malicious_vote,
-      process_PrepareBlock_pending_vote in Hpr.
+      process_PrepareBlock_pending_vote,
+      process_PrepareBlock_vote in Hpr.
       destruct process; decompose record Hpr; rewrite H0; simpl; reflexivity.
   * case (node_eq_dec n (node_id (fst g n'))); [intro Heq;apply node_eqb_correct in Heq; congruence|].
     intro Hneq.
@@ -684,22 +685,24 @@ Proof.
   rewrite H_deliver.
   simpl.
   rewrite (protocol_trace_state_sane Htr).
-  rewrite node_eqb_refl. 
+  rewrite node_eqb_refl.
   destruct p0;
     assert (H_step_copy := H_step);
     destruct H_step as [H_update [H_out _]];
     rewrite H_update;
     rewrite H_out in H_fresh; simpl;
       try easy.
-  unfold make_PrepareBlocks in H_fresh;
-    simpl in H_fresh; tauto.
-  simpl in H_fresh; destruct H_fresh. tauto.
-  right. rewrite in_app_iff.  tauto.
-  unfold make_PrepareBlocks in H_fresh; simpl in H_fresh; tauto. 
-  apply in_app_iff; left; assumption.
-  (* Vanquished bug here *)
-  unfold make_PrepareBlocks in H_fresh; simpl in H_fresh; tauto. 
-  apply in_app_iff; tauto.
+  - unfold make_PrepareBlocks in H_fresh;
+     simpl in H_fresh; tauto.
+  - apply in_app_iff.
+    left; tauto.
+  - simpl in H_fresh; destruct H_fresh. tauto.
+    right. rewrite in_app_iff.  tauto.
+  - unfold make_PrepareBlocks in H_fresh; simpl in H_fresh; tauto. 
+  - apply in_app_iff; left; assumption.  
+  - (* Vanquished bug here *)
+    unfold make_PrepareBlocks in H_fresh; simpl in H_fresh; tauto. 
+  - apply in_app_iff; tauto.
 Qed.
 
 Lemma out_message_change_tells_sender :
@@ -1169,67 +1172,85 @@ Proof.
              assert (PrepareVote = PrepareQC) by tauto;
              discriminate);
         try (rewrite <- H in H_type; discriminate);
-        try inversion H. 
-      (* In the three cases where voting actually occurs,
+        try inversion H.
+      (* In the four cases where voting actually occurs,
        the existential witness is in H *)  
       
-      apply in_map_iff in H;
-      destruct H as [msg' [H_eq' H_about_msg']];
-      exists msg'; rewrite <- H_eq';
-      apply filter_In in H_about_msg';
-      destruct H_about_msg' as [H_in' H_about_msg'];
-      apply andb_prop in H_about_msg'.
-      destruct H_about_msg' as [H_view' H_type'].
-      apply andb_prop in H_view'.
-      destruct H_view' as [H_view' _].
-      apply andb_prop in H_view'.
-      destruct H_view' as [H_view' _].
-      rewrite message_type_eqb_correct in H_type'.
-      repeat split; try tauto.
-      now apply counting_messages_monotonic.
-      unfold view_valid in H_rest.
-      rewrite Nat.eqb_eq in H_view'.
-      rewrite H_view'. symmetry; easy.
+      * apply in_map_iff in H;
+        destruct H as [msg' [H_eq' H_about_msg']];
+        exists msg'; rewrite <- H_eq';
+        apply filter_In in H_about_msg';
+        destruct H_about_msg' as [H_in' H_about_msg'];
+        apply andb_prop in H_about_msg'.
+        destruct H_about_msg' as [H_view' H_type'].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        rewrite message_type_eqb_correct in H_type'.
+        repeat split; try tauto.
+        now apply counting_messages_monotonic.
+        unfold view_valid in H_rest.
+        rewrite Nat.eqb_eq in H_view'.
+        rewrite H_view'. symmetry; easy.
 
-      apply in_map_iff in H;
-      destruct H as [msg' [H_eq' H_about_msg']];
-      exists msg'; rewrite <- H_eq';
-      apply filter_In in H_about_msg';
-      destruct H_about_msg' as [H_in' H_about_msg'];
-      apply andb_prop in H_about_msg'.
-      destruct H_about_msg' as [H_view' H_type'].
-      apply andb_prop in H_view'.
-      destruct H_view' as [H_view' _].
-      apply andb_prop in H_view'.
-      destruct H_view' as [H_view' _].
-      rewrite message_type_eqb_correct in H_type'.
-      repeat split; try tauto.
-      now apply counting_messages_monotonic.
-      unfold view_valid in H_rest.
-      rewrite Nat.eqb_eq in H_view'.
-      rewrite H_view'. symmetry; easy.
+      * apply in_map_iff in H;
+        destruct H as [msg' [H_eq' H_about_msg']];
+        exists msg'; rewrite <- H_eq';
+        apply filter_In in H_about_msg';
+        destruct H_about_msg' as [H_in' H_about_msg'];
+        apply andb_prop in H_about_msg'.
+        destruct H_about_msg' as [H_view' H_type'].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        rewrite message_type_eqb_correct in H_type'.
+        repeat split; try tauto.
+        now apply counting_messages_monotonic.
+        unfold view_valid in H_rest.
+        rewrite Nat.eqb_eq in H_view'.
+        rewrite H_view'. symmetry; easy.
 
-      apply in_map_iff in H;
-      destruct H as [msg' [H_eq' H_about_msg']];
-      exists msg'; rewrite <- H_eq';
-      apply filter_In in H_about_msg';
-      destruct H_about_msg' as [H_in' H_about_msg'];
-      apply andb_prop in H_about_msg'.
-      destruct H_about_msg' as [H_view' H_type'].
-      apply andb_prop in H_view'.
-      destruct H_view' as [H_view' _].
-      apply andb_prop in H_view'.
-      destruct H_view' as [H_view' _].
-      rewrite message_type_eqb_correct in H_type'.
-      repeat split; try tauto.
-      now apply counting_messages_monotonic.
-      unfold view_valid in H_rest.
-      rewrite Nat.eqb_eq in H_view'.
-      rewrite H_view'. symmetry; easy.
-      
-      (* In the timeout case *)
-      rewrite H_timeout in H_sent. 
-      apply is_member_correct in H_part;
+      * apply in_map_iff in H;
+        destruct H as [msg' [H_eq' H_about_msg']];
+        exists msg'; rewrite <- H_eq';
+        apply filter_In in H_about_msg';
+        destruct H_about_msg' as [H_in' H_about_msg'];
+        apply andb_prop in H_about_msg'.
+        destruct H_about_msg' as [H_view' H_type'].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        rewrite message_type_eqb_correct in H_type'.
+        repeat split; try tauto.
+        now apply counting_messages_monotonic.
+        unfold view_valid in H_rest.
+        rewrite Nat.eqb_eq in H_view'.
+        rewrite H_view'. symmetry; easy.
+
+      * apply in_map_iff in H;
+        destruct H as [msg' [H_eq' H_about_msg']];
+        exists msg'; rewrite <- H_eq';
+        apply filter_In in H_about_msg';
+        destruct H_about_msg' as [H_in' H_about_msg'];
+        apply andb_prop in H_about_msg'.
+        destruct H_about_msg' as [H_view' H_type'].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        apply andb_prop in H_view'.
+        destruct H_view' as [H_view' _].
+        rewrite message_type_eqb_correct in H_type'.
+        repeat split; try tauto.
+        now apply counting_messages_monotonic.
+        unfold view_valid in H_rest.
+        rewrite Nat.eqb_eq in H_view'.
+        rewrite H_view'. symmetry; easy.
+
+      * (* In the timeout case *)
+        rewrite H_timeout in H_sent. 
+        apply is_member_correct in H_part;
         simpl in H_sent;
         rewrite H_part in H_sent;
         tauto.

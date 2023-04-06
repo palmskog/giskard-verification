@@ -1018,7 +1018,7 @@ Definition get_transition (t : NState_transition_type) : (NState -> message -> N
   | discard_view_invalid_type => discard_view_invalid
   | process_PrepareBlock_duplicate_type => process_PrepareBlock_duplicate
   | process_PrepareBlock_pending_vote_type => process_PrepareBlock_pending_vote
-  | process_PrepareBlock_vote_type => process_PrepareBlock_pending_vote
+  | process_PrepareBlock_vote_type => process_PrepareBlock_vote
   | process_PrepareQC_last_block_new_proposer_type => process_PrepareQC_last_block_new_proposer
   | process_PrepareQC_last_block_type => process_PrepareQC_last_block
   | process_PrepareQC_non_last_block_type => process_PrepareQC_non_last_block
