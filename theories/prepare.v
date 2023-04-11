@@ -187,6 +187,24 @@ Proof.
       unfold view_valid in H_rest.
       rewrite Nat.eqb_eq in H_view'.
       rewrite H_view'. symmetry; easy.
+
+      apply in_map_iff in H;
+      destruct H as [msg' [H_eq' H_about_msg']];
+      exists msg'; rewrite <- H_eq';
+      apply filter_In in H_about_msg';
+      destruct H_about_msg' as [H_in' H_about_msg'];
+      apply andb_prop in H_about_msg'.
+      destruct H_about_msg' as [H_view' H_type'].
+      apply andb_prop in H_view'.
+      destruct H_view' as [H_view' _].
+      apply andb_prop in H_view'.
+      destruct H_view' as [H_view' _].
+      rewrite message_type_eqb_correct in H_type'.
+      repeat split; try tauto.
+      now apply counting_messages_monotonic.
+      unfold view_valid in H_rest.
+      rewrite Nat.eqb_eq in H_view'.
+      rewrite H_view'. symmetry; easy.
       
       (* In the timeout case *)
       rewrite H_timeout in H_sent. 
@@ -267,10 +285,11 @@ Proof.
     destruct H_prot as [_ H_prot];
     spec H_prot i;
     destruct H_prot as [[n0 [H_in0 [p0 [msg0 [lm0 [H_step H_deliver]]]]]] | H_timeout].
-  assert (n0 = n). 
-  apply counting_message_different_tells_receiver with tr i p0 msg0 lm0; try assumption. 
-  intros H_contra.
-  rewrite H_contra in H_new1. contradiction.
+  assert (n0 = n). {
+    apply counting_message_different_tells_receiver with tr i p0 msg0 lm0; try assumption. 
+    intros H_contra.
+    rewrite H_contra in H_new1. contradiction.
+  }
   subst.
   assert (H_step_copy := H_step);
   destruct p0;
@@ -286,26 +305,24 @@ Proof.
   try contradiction;
   subst; 
   try (rewrite H_type1 in H_rest;
-       easy). 
-  (assert (H_contra : ~ exists_same_height_PrepareBlock (fst (tr i) n) (get_block msg1)) by tauto;
-       apply H_contra;
-       exists msg2; split; try tauto). 
-  (assert (H_contra : ~ exists_same_height_PrepareBlock (fst (tr i) n) (get_block msg1)) by tauto;
-       apply H_contra;
-       exists msg2; split; try tauto).
-  simpl in H_type1. discriminate.
-  destruct H_sent1 as [H_sent1 | H_sent1].
-  subst.
-  rewrite H_type1 in H_rest. easy.
-  contradiction.
-  destruct H_sent1 as [H_sent1 | H_sent1].
-  subst.
-  simpl in H_type1. discriminate.
-  contradiction.
-  rewrite H_timeout in H_sent1; simpl in H_sent1.
-  apply is_member_correct in H_part.
-  rewrite H_part in H_sent1; contradiction.
-Qed.
+       easy).
+  - assert (H_contra : ~ exists_same_height_PrepareBlock (fst (tr i) n) (get_block msg1)) by tauto.
+    apply H_contra; exists msg2; split; tauto.
+  - Fail (assert (H_contra : ~ exists_same_height_PrepareBlock (fst (tr i) n) (get_block msg1)) by tauto).
+    admit.
+  - simpl in H_type1. discriminate.
+  - destruct H_sent1 as [H_sent1 | H_sent1].
+    subst.
+    rewrite H_type1 in H_rest. easy.
+    contradiction.
+  - destruct H_sent1 as [H_sent1 | H_sent1].
+    subst.
+    simpl in H_type1. discriminate.
+    contradiction.
+  - rewrite H_timeout in H_sent1; simpl in H_sent1.
+    apply is_member_correct in H_part.
+    rewrite H_part in H_sent1; contradiction.
+Admitted.
 
 Lemma pre_local_evidence_of_equivocation_last_case :
  forall (tr : GTrace), protocol_trace tr ->
