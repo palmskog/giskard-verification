@@ -532,3 +532,24 @@ split.
 Qed.
 
 (* END REFINEMENT PROOFS *)
+
+(* BEGIN TEST CASES *)
+
+Section TestCases.
+
+Variable n : node.
+Variable b : block.
+
+Example propose_block_init_set_example_0 :
+ let s := NState_init n in
+ let lm := make_PrepareBlocks s (GenesisBlock_message s) in
+ propose_block_init_set s (mkMessage PrepareQC 0 n b b) =
+  ({| node_view := 0; node_id := n; in_messages := []; counting_messages := [];
+      out_messages := lm; timeout := false |}, lm).
+Proof.
+ reflexivity.
+Qed.
+
+End TestCases.
+
+(* END TEST CASES *)
