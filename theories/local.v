@@ -431,10 +431,11 @@ This is modeled by constructing <<PrepareVote>> messages on-demand given that:
 (** Constructing pending PrepareVote messages for child messages with existing PrepareBlocks. *)
 Definition pending_PrepareVote (s : NState) (quorum_msg : message) : list message :=
   map (fun prepare_block_msg => make_PrepareVote s quorum_msg prepare_block_msg)
-      (filter (fun msg => Nat.eqb (get_view msg) (get_view quorum_msg) &&
+      (filter (fun msg => Nat.eqb (get_view msg) (node_view s) &&
                        negb (exists_same_height_blockb s (get_block msg)) &&
                        parent_ofb (get_block msg) (get_block quorum_msg) &&
-                       message_type_eqb (get_message_type msg) PrepareBlock)
+                       message_type_eqb (get_message_type msg) PrepareBlock &&
+                       negb prepare_vote_already_sent s (get_block msg))
               (counting_messages s)). 
 
 Lemma pending_PrepareVote_correct :
@@ -567,11 +568,14 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
 
 (** Parent block has reached QC - send PrepareVote for the block in that message and record in out buffer: *) 
 Definition process_PrepareBlock_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
+  let quorum_msg :=
+   (get_quorum_msg_for_block state (parent_of (get_block msg))
+  in
   s' = (* Record outgoing PrepareVote messages *)
        record_plural
          (process s msg)
-         (pending_PrepareVote s msg) /\
-  lm = (pending_PrepareVote s msg) /\
+         (pending_PrepareVote (process s msg) quorum_msg) /\
+  lm = (pending_PrepareVote (process s msg) quorum_msg) /\
   received s msg /\
   honest_node (node_id s) /\ 
   get_message_type msg = PrepareBlock /\ 
@@ -632,16 +636,15 @@ Definition process_PrepareQC_last_block_new_proposer (s : NState) (msg : message
          (increment_view (process s msg))
          (* All to-propose blocks *)
          (* The block generating function starts at the input block height plus one *)
-         (make_PrepareBlocks (increment_view (process s msg)) msg) /\ 
+         (make_PrepareBlocks (increment_view (process s msg)) quorum_msg /\
   lm = (* Send all block proposals for the new view *)
-  make_PrepareBlocks (increment_view (process s msg)) msg /\ 
+  make_PrepareBlocks (increment_view (process s msg)) quorum_msg /\
   received s msg /\ 
   honest_node (node_id s) /\ 
   get_message_type msg = PrepareQC /\ 
   view_valid s msg /\
   (* Here we don't need for timeout to be false because apparently we can still
     process PrepareQC messages in the timeout period *)
-  last_block (get_block msg) /\
   is_block_proposer (node_id s) (S (node_view s)).
 
 (** Last block in the view for to-be validator - increment view: *) 
@@ -668,6 +671,20 @@ Definition process_PrepareQC_non_last_block (s : NState) (msg : message) (s' : N
   view_valid s msg /\
   timeout s = false /\ 
   ~ last_block (get_block msg).
+
+Definition process_ViewChange_quorum_not_new_proposer
+ (s: NState) (msg : Message) (s': NState) (lm: list message) : Prop :=
+  let msg_vc := (highest_ViewChange_message((process state msg))) in
+  let lm_prime := [] :: (if ¬ (prepare_qc_already_sent state (get_block msg_vc))
+   then (makePrepareQC state msg) else []) :: (make_ViewChangeQC (process state msg) msg_vc) in
+  s' = (record_plural (process s msg) lm_prime) /\
+  lm = lm_prime /\
+  received state msg ∧
+  honest_node (node_id s) ∧
+  get_message_type msg = ViewChange ∧
+  view_valid s msg ∧
+  view_change_quorum_in_view (process s msg) (node_view s) ∧
+  not is_block_proposer (node_id s) (S (node_view s)).
 
 (** *** ViewChange message-related actions *)
 
@@ -1018,7 +1035,7 @@ Definition get_transition (t : NState_transition_type) : (NState -> message -> N
   | discard_view_invalid_type => discard_view_invalid
   | process_PrepareBlock_duplicate_type => process_PrepareBlock_duplicate
   | process_PrepareBlock_pending_vote_type => process_PrepareBlock_pending_vote
-  | process_PrepareBlock_vote_type => process_PrepareBlock_pending_vote
+  | process_PrepareBlock_vote_type => process_PrepareBlock_vote
   | process_PrepareQC_last_block_new_proposer_type => process_PrepareQC_last_block_new_proposer
   | process_PrepareQC_last_block_type => process_PrepareQC_last_block
   | process_PrepareQC_non_last_block_type => process_PrepareQC_non_last_block
