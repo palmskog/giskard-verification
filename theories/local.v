@@ -439,7 +439,11 @@ This is modeled by constructing <<PrepareVote>> messages on-demand given that:
                 return True
         return False
 *)
-Parameter prepare_vote_already_sent : NState -> block -> bool.
+Definition prepare_vote_already_sent (s : NState) (b : block) : bool :=
+  existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareVote
+                                    && Nat.eqb (get_view msg) (node_view s)
+                                    && block_eqb (get_block msg) b)
+    (out_messages s).
 
 (** Constructing pending PrepareVote messages for child messages with existing PrepareBlocks. *)
 Definition pending_PrepareVote (s : NState) (quorum_msg : message) : list message :=
@@ -810,7 +814,11 @@ Definition highest_ViewChange_message (s : NState) : message :=
                 return True
         return False
 *)
-Parameter prepare_qc_already_sent : NState -> block -> bool.
+Definition prepare_qc_already_sent (s : NState) (b : block) : bool :=
+ existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareQC
+                              && Nat.eqb (get_view msg) (node_view s)
+                              && block_eqb (get_block msg) b)
+ (out_messages s).
 
 Definition process_ViewChange_quorum_not_new_proposer
  (s: NState) (msg : message) (s': NState) (lm: list message) : Prop :=
