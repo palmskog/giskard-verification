@@ -428,6 +428,19 @@ This is modeled by constructing <<PrepareVote>> messages on-demand given that:
 - a <<PrepareBlock>> message exists for the child block.
 *)
 
+(*
+    @staticmethod
+    def prepare_vote_already_sent(state: NState, b: GiskardBlock) -> bool:
+        msg: GiskardMessage
+        for msg in state.out_messages:
+            if msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_VOTE \
+                    and msg.block == b \
+                    and msg.view == state.node_view:
+                return True
+        return False
+*)
+Parameter prepare_vote_already_sent : NState -> block -> bool.
+
 (** Constructing pending PrepareVote messages for child messages with existing PrepareBlocks. *)
 Definition pending_PrepareVote (s : NState) (quorum_msg : message) : list message :=
   map (fun prepare_block_msg => make_PrepareVote s quorum_msg prepare_block_msg)
@@ -435,8 +448,8 @@ Definition pending_PrepareVote (s : NState) (quorum_msg : message) : list messag
                        negb (exists_same_height_blockb s (get_block msg)) &&
                        parent_ofb (get_block msg) (get_block quorum_msg) &&
                        message_type_eqb (get_message_type msg) PrepareBlock &&
-                       negb prepare_vote_already_sent s (get_block msg))
-              (counting_messages s)). 
+                       negb (prepare_vote_already_sent s (get_block msg)))
+              (counting_messages s)).
 
 Lemma pending_PrepareVote_correct :
   forall s msg0 msg,
@@ -444,7 +457,7 @@ Lemma pending_PrepareVote_correct :
     get_message_type msg = PrepareVote /\
     get_sender msg = node_id s /\
     get_view msg = node_view s.
-Proof.  
+Proof.
   intros. 
   unfold pending_PrepareVote in H.
   rewrite in_map_iff in H.
@@ -454,7 +467,7 @@ Proof.
   repeat (apply andb_prop in H0;
           destruct H0). 
   rewrite Nat.eqb_eq in *.
-  rewrite message_type_eqb_correct in H1.
+  rewrite message_type_eqb_correct in H2.
   rewrite <- H_type'. unfold make_PrepareVote; repeat split; simpl; try tauto.
 Qed.
 
@@ -564,13 +577,45 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
   timeout s = false /\ 
   ~ exists_same_height_PrepareBlock s (get_block msg) /\
   (* Parent block has not reached Prepare *)
-  ~ prepare_stage s (parent_of (get_block msg)). 
+  ~ prepare_stage s (parent_of (get_block msg)).
+
+(*
+    @staticmethod
+    def get_vote_quorum_msg_in_view(state: NState, view: int, b: GiskardBlock, peers) -> GiskardMessage:
+        """ Returns True if there is a vote quorum in the given view, for the given block """
+        if Giskard.quorum(Giskard.processed_PrepareVote_in_view_about_block(state, view, b), peers):
+            return Giskard.processed_PrepareVote_in_view_about_block(state, view, b)[-1]
+
+    @staticmethod
+    def get_quorum_msg_in_view(state: NState, view: int, b: GiskardBlock, peers) -> GiskardMessage:
+        """ Returns the PrepareQC or vote-quorum msg for the given block,
+         if there is one in the given view """
+        if Giskard.PrepareQC_in_view(state, view, b):
+            return Giskard.get_PrepareQC_in_view(state, view, b)
+        return Giskard.get_vote_quorum_msg_in_view(state, view, b, peers)
+
+    @staticmethod
+    def get_quorum_msg_for_block(state: NState, b: GiskardBlock, peers) -> GiskardMessage:
+        """ Returns the PrepareQC or Vote-quorum msg for the given block,
+         if there is one """
+        if b is None:  # TODO check if this might lead to issues
+            print("get_quorum_msg_for_block was given a None type block")
+            return Giskard.GenesisBlock_message(state)
+        if GiskardGenesisBlock() == b:
+            return Giskard.GenesisBlock_message(state)
+        v_prime = state.node_view
+        while v_prime >= 0:
+            if Giskard.prepare_stage_in_view(state, v_prime, b, peers):
+                return Giskard.get_quorum_msg_in_view(state, v_prime, b, peers)
+            v_prime -= 1
+        return None
+*)
+
+Parameter get_quorum_msg_for_block : NState -> block -> message.
 
 (** Parent block has reached QC - send PrepareVote for the block in that message and record in out buffer: *) 
 Definition process_PrepareBlock_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
-  let quorum_msg :=
-   (get_quorum_msg_for_block state (parent_of (get_block msg))
-  in
+  let quorum_msg := get_quorum_msg_for_block s (parent_of (get_block msg)) in
   s' = (* Record outgoing PrepareVote messages *)
        record_plural
          (process s msg)
@@ -630,13 +675,14 @@ enough PrepareVote messages, *)
 - propose block at height <<(S n)>>. *)
 
 Definition process_PrepareQC_last_block_new_proposer (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
-  (* Increment the view; propose next block *) 
+  let quorum_msg := get_quorum_msg_for_block s (parent_of (get_block msg)) in
+  (* Increment the view; propose next block *)
   s' = record_plural
          (* New state *)
          (increment_view (process s msg))
          (* All to-propose blocks *)
          (* The block generating function starts at the input block height plus one *)
-         (make_PrepareBlocks (increment_view (process s msg)) quorum_msg /\
+         (make_PrepareBlocks (increment_view (process s msg)) quorum_msg) /\
   lm = (* Send all block proposals for the new view *)
   make_PrepareBlocks (increment_view (process s msg)) quorum_msg /\
   received s msg /\ 
@@ -671,20 +717,6 @@ Definition process_PrepareQC_non_last_block (s : NState) (msg : message) (s' : N
   view_valid s msg /\
   timeout s = false /\ 
   ~ last_block (get_block msg).
-
-Definition process_ViewChange_quorum_not_new_proposer
- (s: NState) (msg : Message) (s': NState) (lm: list message) : Prop :=
-  let msg_vc := (highest_ViewChange_message((process state msg))) in
-  let lm_prime := [] :: (if ¬ (prepare_qc_already_sent state (get_block msg_vc))
-   then (makePrepareQC state msg) else []) :: (make_ViewChangeQC (process state msg) msg_vc) in
-  s' = (record_plural (process s msg) lm_prime) /\
-  lm = lm_prime /\
-  received state msg ∧
-  honest_node (node_id s) ∧
-  get_message_type msg = ViewChange ∧
-  view_valid s msg ∧
-  view_change_quorum_in_view (process s msg) (node_view s) ∧
-  not is_block_proposer (node_id s) (S (node_view s)).
 
 (** *** ViewChange message-related actions *)
 
@@ -766,6 +798,37 @@ Qed.
 
 Definition highest_ViewChange_message (s : NState) : message :=
   highest_message_in_list (node_id s) ViewChange (processed_ViewChange_in_view s (node_view s)).
+
+(*
+    @staticmethod
+    def prepare_qc_already_sent(state: NState, b: GiskardBlock) -> bool:
+        msg: GiskardMessage
+        for msg in state.out_messages:
+            if msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_QC \
+                    and msg.block == b \
+                    and msg.view == state.node_view:
+                return True
+        return False
+*)
+Parameter prepare_qc_already_sent : NState -> block -> bool.
+
+Definition process_ViewChange_quorum_not_new_proposer
+ (s: NState) (msg : message) (s': NState) (lm: list message) : Prop :=
+  let msg_vc := highest_ViewChange_message (process s msg) in
+  let lm_prime :=
+    if negb (prepare_qc_already_sent s (get_block msg_vc)) then
+      [make_PrepareQC s msg; make_ViewChangeQC (process s msg) msg_vc]
+    else
+      [make_ViewChangeQC (process s msg) msg_vc]
+  in
+  s' = record_plural (process s msg) lm_prime /\
+  lm = lm_prime /\
+  received s msg /\
+  honest_node (node_id s) /\
+  get_message_type msg = ViewChange /\
+  view_valid s msg /\
+  view_change_quorum_in_view (process s msg) (node_view s) /\
+  ~ is_block_proposer (node_id s) (S (node_view s)).
 
 Lemma highest_ViewChange_message_type_eq_ViewChange :
   forall s, get_message_type (highest_ViewChange_message s) = ViewChange.
