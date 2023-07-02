@@ -589,7 +589,16 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
         """ Returns True if there is a vote quorum in the given view, for the given block """
         if Giskard.quorum(Giskard.processed_PrepareVote_in_view_about_block(state, view, b), peers):
             return Giskard.processed_PrepareVote_in_view_about_block(state, view, b)[-1]
+*)
 
+Fixpoint final {A} (l : list A) : option A :=
+match l with [] => None | [x] => Some x | _ :: l => final l end.
+
+Definition vote_quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : message) : Prop :=
+ quorum (processed_PrepareVote_in_view_about_block s view b) /\
+ final (processed_PrepareVote_in_view_about_block s view b) = Some msg.
+
+(*
     @staticmethod
     def get_quorum_msg_in_view(state: NState, view: int, b: GiskardBlock, peers) -> GiskardMessage:
         """ Returns the PrepareQC or vote-quorum msg for the given block,
@@ -597,7 +606,16 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
         if Giskard.PrepareQC_in_view(state, view, b):
             return Giskard.get_PrepareQC_in_view(state, view, b)
         return Giskard.get_vote_quorum_msg_in_view(state, view, b, peers)
+*)
 
+Definition quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : message) : Prop :=
+ (In msg (counting_messages s) /\
+  get_view msg = view /\
+  get_block msg = b /\
+  get_message_type msg = PrepareQC)
+ \/ vote_quorum_msg_in_view s view b msg.
+
+(*
     @staticmethod
     def get_quorum_msg_for_block(state: NState, b: GiskardBlock, peers) -> GiskardMessage:
         """ Returns the PrepareQC or Vote-quorum msg for the given block,
@@ -615,11 +633,15 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
         return None
 *)
 
-Parameter get_quorum_msg_for_block : NState -> block -> message.
+Definition quorum_msg_for_block (s : NState) (b : block) (msg : message) : Prop :=
+ (b = GenesisBlock /\ msg = GenesisBlock_message s) \/
+ (b <> GenesisBlock /\ exists v_prime, v_prime <= node_view s /\
+   prepare_stage_in_view s v_prime b /\
+   quorum_msg_in_view s v_prime b msg).
 
 (** Parent block has reached QC - send PrepareVote for the block in that message and record in out buffer: *) 
 Definition process_PrepareBlock_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
-  let quorum_msg := get_quorum_msg_for_block s (parent_of (get_block msg)) in
+  exists quorum_msg, quorum_msg_for_block s (parent_of (get_block msg)) quorum_msg /\
   s' = (* Record outgoing PrepareVote messages *)
        record_plural
          (process s msg)
@@ -679,7 +701,7 @@ enough PrepareVote messages, *)
 - propose block at height <<(S n)>>. *)
 
 Definition process_PrepareQC_last_block_new_proposer (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
-  let quorum_msg := get_quorum_msg_for_block s (parent_of (get_block msg)) in
+  exists quorum_msg, quorum_msg_for_block s (parent_of (get_block msg)) quorum_msg /\
   (* Increment the view; propose next block *)
   s' = record_plural
          (* New state *)
@@ -1139,8 +1161,11 @@ Proof.
     try (destruct H_step_copy as [_ [_ [_ [H_init _]]]]; 
          rewrite H_init in H_in; inversion H_in);
     try (rewrite H_subst; simpl; try rewrite in_app_iff; repeat right; 
-         assumption).
-Qed. 
+         assumption);
+    try (destruct H_step_copy as [? [_ [H_init _]]]; 
+         rewrite H_init;
+         apply in_app_iff; right; assumption).
+Qed.
 
 Lemma counting_messages_same_view_monotonic :
   forall (s1 s2 : NState) (msg : message) (lm : list message) (t : NState_transition_type),
@@ -1151,15 +1176,46 @@ Lemma counting_messages_same_view_monotonic :
       In msg0 (counting_messages s2). 
 Proof.     
   intros s1 s2 msg lm t H_step H_view msg0 H_in.
-  destruct t; simpl in H_step;
-    destruct H_step as [H_subst _];
-    simpl in H_subst; 
-    try (subst; assumption); 
-    try rewrite H_subst in *; simpl;
-      try (simpl in H_view; lia);
-      try (right; assert (In msg0 (pending_messages_about_block s1 (get_block msg)) \/ In msg0 (out_messages s1)) by tauto;
-           apply in_app_iff in H; assumption);
-      try tauto.
+  destruct t; simpl in H_step.
+  - destruct H_step as [H_subst _].
+    subst; assumption.
+  - destruct H_step as [H_subst _].
+    subst; assumption.
+  - destruct H_step as [H_subst _].
+    subst; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [? [_ [H_subst _]]].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [? [_ [H_subst _]]].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
+    right; assumption.
 Qed.
 
 Lemma counting_messages_local_monotonic :
@@ -1182,6 +1238,14 @@ Proof.
          rewrite H_init in H_in; inversion H_in);
     try (rewrite H_subst; simpl; try rewrite in_app_iff; repeat right; 
          assumption).
+  - clear H_subst.
+    destruct H_step_copy as [? [_ [H_subst _]]].
+    rewrite H_subst; simpl.
+    right; assumption.
+  - clear H_subst.
+    destruct H_step_copy as [? [_ [H_subst _]]].
+    rewrite H_subst; simpl.
+    right; assumption.
 Qed.
 
 Lemma about_local_out_messages :
@@ -1194,8 +1258,8 @@ Proof.
   intros s1 s2 msg lm p H_step msg0 H_in. 
   destruct p;
     assert (H_step_copy := H_step);
-    destruct H_step as [H_update [H_out _]];
-    rewrite H_out in H_in;
+    try destruct H_step as [H_update [H_out _]];
+    try rewrite H_out in H_in;
     (* In cases where lm = [] *) 
     try (now apply in_nil in H_in);
     try (rewrite H_update; simpl;
@@ -1206,7 +1270,16 @@ Proof.
     try (rewrite H_update; 
          simpl in *;
          destruct H_in as [H_in | [H_in | [H_in | H_in]]];
-         tauto). 
+         tauto).
+  - clear H_update H_out; destruct H_step_copy as [? [_ [H_update [H_out _]]]].
+    rewrite H_update; simpl.
+    rewrite H_out in H_in.
+    apply in_app_iff; left; assumption.
+  - clear H_update H_out; destruct H_step_copy as [? [_ [H_update [H_out _]]]].
+    rewrite H_update; simpl.
+    rewrite H_out in H_in.
+    simpl in *.
+    destruct H_in as [H_in | [H_in | [H_in | H_in]]]; tauto.
 Qed.
 
 Lemma not_prepare_stage :
