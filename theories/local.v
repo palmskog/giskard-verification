@@ -1118,6 +1118,7 @@ Inductive NState_transition_type :=
 | process_PrepareQC_last_block_type
 | process_PrepareQC_non_last_block_type
 | process_ViewChange_quorum_new_proposer_type
+| process_ViewChange_quorum_not_new_proposer_type
 | process_ViewChange_pre_quorum_type
 | process_ViewChangeQC_single_type
 | process_PrepareBlock_malicious_vote_type.
@@ -1135,6 +1136,7 @@ Definition get_transition (t : NState_transition_type) : (NState -> message -> N
   | process_PrepareVote_vote_type => process_PrepareVote_vote
   | process_PrepareVote_wait_type => process_PrepareVote_wait
   | process_ViewChange_quorum_new_proposer_type => process_ViewChange_quorum_new_proposer
+  | process_ViewChange_quorum_not_new_proposer_type => process_ViewChange_quorum_not_new_proposer
   | process_ViewChange_pre_quorum_type => process_ViewChange_pre_quorum
   | process_ViewChangeQC_single_type => process_ViewChangeQC_single
   | process_PrepareBlock_malicious_vote_type => process_PrepareBlock_malicious_vote
@@ -1212,6 +1214,9 @@ Proof.
     right; assumption.
   - destruct H_step as [H_subst _].
     rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [H_subst _].
+    rewrite H_subst in *; simpl.
     right; right; assumption.
   - destruct H_step as [H_subst _].
     rewrite H_subst in *; simpl.
@@ -1224,7 +1229,7 @@ Lemma counting_messages_local_monotonic :
     forall (msg0 : message),
       In msg0 (counting_messages s1) ->
       In msg0 (counting_messages s2). 
-Proof.     
+Proof.
   intros s1 s2 msg lm t H_step msg0 H_in.
   assert (H_step_copy := H_step). 
   destruct t; simpl in H_step;
