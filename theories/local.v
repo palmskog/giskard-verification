@@ -428,21 +428,10 @@ This is modeled by constructing <<PrepareVote>> messages on-demand given that:
 - a <<PrepareBlock>> message exists for the child block.
 *)
 
-(*
-    @staticmethod
-    def prepare_vote_already_sent(state: NState, b: GiskardBlock) -> bool:
-        msg: GiskardMessage
-        for msg in state.out_messages:
-            if msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_VOTE \
-                    and msg.block == b \
-                    and msg.view == state.node_view:
-                return True
-        return False
-*)
 Definition prepare_vote_already_sent (s : NState) (b : block) : bool :=
-  existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareVote
-                                    && Nat.eqb (get_view msg) (node_view s)
-                                    && block_eqb (get_block msg) b)
+  existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareVote &&
+                               block_eqb (get_block msg) b &&
+                               Nat.eqb (get_view msg) (node_view s))
     (out_messages s).
 
 (** Constructing pending PrepareVote messages for child messages with existing PrepareBlocks. *)
@@ -583,14 +572,6 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
   (* Parent block has not reached Prepare *)
   ~ prepare_stage s (parent_of (get_block msg)).
 
-(*
-    @staticmethod
-    def get_vote_quorum_msg_in_view(state: NState, view: int, b: GiskardBlock, peers) -> GiskardMessage:
-        """ Returns True if there is a vote quorum in the given view, for the given block """
-        if Giskard.quorum(Giskard.processed_PrepareVote_in_view_about_block(state, view, b), peers):
-            return Giskard.processed_PrepareVote_in_view_about_block(state, view, b)[-1]
-*)
-
 Fixpoint final {A} (l : list A) : option A :=
 match l with [] => None | [x] => Some x | _ :: l => final l end.
 
@@ -598,40 +579,14 @@ Definition vote_quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : 
  quorum (processed_PrepareVote_in_view_about_block s view b) /\
  final (processed_PrepareVote_in_view_about_block s view b) = Some msg.
 
-(*
-    @staticmethod
-    def get_quorum_msg_in_view(state: NState, view: int, b: GiskardBlock, peers) -> GiskardMessage:
-        """ Returns the PrepareQC or vote-quorum msg for the given block,
-         if there is one in the given view """
-        if Giskard.PrepareQC_in_view(state, view, b):
-            return Giskard.get_PrepareQC_in_view(state, view, b)
-        return Giskard.get_vote_quorum_msg_in_view(state, view, b, peers)
-*)
-
-Definition quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : message) : Prop :=
- (In msg (counting_messages s) /\
+Definition PrepareQC_msg_in_view (s : NState) (view : nat) (b : block) (msg : message) : Prop :=
+  In msg (counting_messages s) /\ 
   get_view msg = view /\
   get_block msg = b /\
-  get_message_type msg = PrepareQC)
- \/ vote_quorum_msg_in_view s view b msg.
+  get_message_type msg = PrepareQC.
 
-(*
-    @staticmethod
-    def get_quorum_msg_for_block(state: NState, b: GiskardBlock, peers) -> GiskardMessage:
-        """ Returns the PrepareQC or Vote-quorum msg for the given block,
-         if there is one """
-        if b is None:  # TODO check if this might lead to issues
-            print("get_quorum_msg_for_block was given a None type block")
-            return Giskard.GenesisBlock_message(state)
-        if GiskardGenesisBlock() == b:
-            return Giskard.GenesisBlock_message(state)
-        v_prime = state.node_view
-        while v_prime >= 0:
-            if Giskard.prepare_stage_in_view(state, v_prime, b, peers):
-                return Giskard.get_quorum_msg_in_view(state, v_prime, b, peers)
-            v_prime -= 1
-        return None
-*)
+Definition quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : message) : Prop :=
+ PrepareQC_msg_in_view s view b msg \/ vote_quorum_msg_in_view s view b msg.
 
 Definition quorum_msg_for_block (s : NState) (b : block) (msg : message) : Prop :=
  (b = GenesisBlock /\ msg = GenesisBlock_message s) \/
@@ -825,21 +780,10 @@ Qed.
 Definition highest_ViewChange_message (s : NState) : message :=
   highest_message_in_list (node_id s) ViewChange (processed_ViewChange_in_view s (node_view s)).
 
-(*
-    @staticmethod
-    def prepare_qc_already_sent(state: NState, b: GiskardBlock) -> bool:
-        msg: GiskardMessage
-        for msg in state.out_messages:
-            if msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_QC \
-                    and msg.block == b \
-                    and msg.view == state.node_view:
-                return True
-        return False
-*)
 Definition prepare_qc_already_sent (s : NState) (b : block) : bool :=
- existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareQC
-                              && Nat.eqb (get_view msg) (node_view s)
-                              && block_eqb (get_block msg) b)
+ existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareQC &&
+                              block_eqb (get_block msg) b &&
+                              Nat.eqb (get_view msg) (node_view s))
  (out_messages s).
 
 Definition process_ViewChange_quorum_not_new_proposer
@@ -1178,47 +1122,17 @@ Lemma counting_messages_same_view_monotonic :
       In msg0 (counting_messages s2). 
 Proof.     
   intros s1 s2 msg lm t H_step H_view msg0 H_in.
-  destruct t; simpl in H_step.
-  - destruct H_step as [H_subst _].
-    subst; assumption.
-  - destruct H_step as [H_subst _].
-    subst; assumption.
-  - destruct H_step as [H_subst _].
-    subst; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; assumption.
+  destruct t; simpl in H_step;
+    try (destruct H_step as [H_subst _];
+         subst; assumption);
+    try (destruct H_step as [H_subst _];
+         subst; right; assumption);
+    try (destruct H_step as [H_subst _];
+         subst; right; right; assumption).
   - destruct H_step as [? [_ [H_subst _]]].
     rewrite H_subst in *; simpl.
     right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; assumption.
   - destruct H_step as [? [_ [H_subst _]]].
-    rewrite H_subst in *; simpl.
-    right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; assumption.
-  - destruct H_step as [H_subst _].
-    rewrite H_subst in *; simpl.
-    right; right; assumption.
-  - destruct H_step as [H_subst _].
     rewrite H_subst in *; simpl.
     right; assumption.
 Qed.
