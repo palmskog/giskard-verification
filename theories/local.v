@@ -450,7 +450,7 @@ Lemma pending_PrepareVote_correct :
     get_message_type msg = PrepareVote /\
     get_sender msg = node_id s /\
     get_view msg = node_view s.
-Proof.
+Proof.  
   intros. 
   unfold pending_PrepareVote in H.
   rewrite in_map_iff in H.
@@ -570,7 +570,7 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
   timeout s = false /\ 
   ~ exists_same_height_PrepareBlock s (get_block msg) /\
   (* Parent block has not reached Prepare *)
-  ~ prepare_stage s (parent_of (get_block msg)).
+  ~ prepare_stage s (parent_of (get_block msg)). 
 
 Fixpoint final {A} (l : list A) : option A :=
 match l with [] => None | [x] => Some x | _ :: l => final l end.
@@ -1111,7 +1111,7 @@ Proof.
     try (destruct H_step_copy as [? [_ [H_init _]]]; 
          rewrite H_init;
          apply in_app_iff; right; assumption).
-Qed.
+Qed. 
 
 Lemma counting_messages_same_view_monotonic :
   forall (s1 s2 : NState) (msg : message) (lm : list message) (t : NState_transition_type),
@@ -1143,7 +1143,7 @@ Lemma counting_messages_local_monotonic :
     forall (msg0 : message),
       In msg0 (counting_messages s1) ->
       In msg0 (counting_messages s2). 
-Proof.
+Proof.     
   intros s1 s2 msg lm t H_step msg0 H_in.
   assert (H_step_copy := H_step). 
   destruct t; simpl in H_step;
@@ -1189,7 +1189,7 @@ Proof.
     try (rewrite H_update; 
          simpl in *;
          destruct H_in as [H_in | [H_in | [H_in | H_in]]];
-         tauto).
+         tauto). 
   - clear H_update H_out; destruct H_step_copy as [? [_ [H_update [H_out _]]]].
     rewrite H_update; simpl.
     rewrite H_out in H_in.
