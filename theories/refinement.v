@@ -46,6 +46,14 @@ Definition increment_view_set (s : NState) : NState :=
 Definition flip_timeout_set (s : NState) : NState :=
  s <| timeout := true |>.
 
+Definition get_vote_quorum_msg_in_view (s : NState) (view : nat) (b : block) : option message :=
+None.
+
+Definition get_quorum_msg_in_view 
+
+Definition get_quorum_msg_for_block (s : NState) (b : block) : option message :=
+None.
+
 (* END BASIC STATE FUNCTIONS *)
 
 (* BEGIN STATE UPDATE FUNCTIONS *)
@@ -79,6 +87,8 @@ Definition process_PrepareBlock_pending_vote_set (s : NState) (msg : message)
   <| counting_messages := msg :: s.(counting_messages) |>
  in (s', []).
 
+(* BEGIN BROKEN *)
+
 Definition process_PrepareBlock_vote_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := pending_PrepareVote s msg in
@@ -87,6 +97,8 @@ Definition process_PrepareBlock_vote_set (s : NState) (msg : message)
    <| counting_messages := msg :: s.(counting_messages) |>
    <| out_messages := lm ++ s.(out_messages) |>
  in (s', lm).
+
+(* END BROKEN *)
 
 Definition process_PrepareVote_wait_set (s : NState) (msg : message)
  : NState * list message :=
@@ -104,6 +116,8 @@ Definition process_PrepareVote_vote_set (s : NState) (msg : message)
   <| counting_messages := msg :: s.(counting_messages) |>
  in (s', lm).
 
+(* BEGIN BROKEN *)
+
 Definition process_PrepareQC_last_block_new_proposer_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := make_PrepareBlocks (increment_view (process_set s msg)) msg in
@@ -115,6 +129,8 @@ Definition process_PrepareQC_last_block_new_proposer_set (s : NState) (msg : mes
   <| timeout := false |>
   <| out_messages := lm ++ s.(out_messages) |>
  in (s', lm).
+
+(* END BROKEN *)
 
 Definition process_PrepareQC_last_block_set (s : NState) (msg : message)
  : NState * list message :=
@@ -316,6 +332,7 @@ split.
   subst; reflexivity.
 Qed.
 
+(*
 Lemma process_PrepareBlock_vote_set_eq : forall s msg s' lm,
  received s msg ->
  honest_node (node_id s) ->
@@ -335,6 +352,7 @@ split.
   destruct Heq' as [Heq' Heq''].
   subst; reflexivity.
 Qed.
+*)
 
 Lemma process_PrepareVote_wait_set_eq : forall s msg s' lm,
  received s msg ->
@@ -377,6 +395,7 @@ split.
   subst; reflexivity.
 Qed.
 
+(*
 Lemma process_PrepareQC_last_block_new_proposer_eq : forall s msg s' lm,
  received s msg ->
  honest_node (node_id s) ->
@@ -395,6 +414,7 @@ split.
   destruct Heq' as [Heq' Heq''].
   subst; reflexivity.
 Qed.
+*)
 
 Lemma process_PrepareQC_last_block_set_eq : forall s msg s' lm,
  received s msg ->
