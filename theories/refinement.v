@@ -121,7 +121,9 @@ Definition flip_timeout_set (s : NState) : NState :=
  s <| timeout := true |>.
 
 Definition get_vote_quorum_msg_in_view (s : NState) (view : nat) (b : block) : option message :=
- final (processed_PrepareVote_in_view_about_block s view b).
+ if quorumb (processed_PrepareVote_in_view_about_block s view b) then
+   final (processed_PrepareVote_in_view_about_block s view b)
+ else None.
 
 Definition get_quorum_msg_in_view (s : NState) (view : nat) (b : block) : option message :=
  match
@@ -330,17 +332,24 @@ Lemma flip_timeout_set_eq : forall s,
 Proof. reflexivity. Qed.
 
 Lemma get_vote_quorum_msg_in_view_eq : forall s view b msg,
- quorum (processed_PrepareVote_in_view_about_block s view b) ->
- (vote_quorum_msg_in_view s view b msg <-> (get_vote_quorum_msg_in_view s view b = Some msg)).
+ vote_quorum_msg_in_view s view b msg <-> (get_vote_quorum_msg_in_view s view b = Some msg).
 Proof.
- split; unfold get_vote_quorum_msg_in_view, vote_quorum_msg_in_view; tauto.
+ split; unfold get_vote_quorum_msg_in_view, vote_quorum_msg_in_view,
+  quorum, quorumb, has_at_least_two_thirds.
+ - intros [Heq Hf].
+   rewrite Heq; assumption.
+ - case_eq (has_at_least_two_thirdsb
+    (map get_sender (processed_PrepareVote_in_view_about_block s view b))).
+   * intros Hb Hf.
+     split; [reflexivity|assumption].
+   * intros Hb Hs.
+     congruence.
 Qed.
 
 Lemma get_quorum_msg_in_view_eq : forall s view b msg,
- quorum (processed_PrepareVote_in_view_about_block s view b) ->
  (quorum_msg_in_view s view b msg <-> get_quorum_msg_in_view s view b = Some msg).
 Proof.
- intros s view b msg Hq.
+ intros s view b msg.
  unfold quorum_msg_in_view, get_quorum_msg_in_view.
  set (fm := find _ (counting_messages s)).
  split.
@@ -375,7 +384,7 @@ Proof.
        contradict Hp.
        exists msg'; tauto.
      + intros Hfm.
-       apply (proj1 (get_vote_quorum_msg_in_view_eq _ _ _ _ Hq)).
+       apply get_vote_quorum_msg_in_view_eq.
        assumption.
  - case_eq fm.
    * intros msg' Hfm Hm.
@@ -393,7 +402,7 @@ Proof.
      apply message_view_block_eqb; tauto.
    * intros Hfm Hv.
      right.
-     apply (get_vote_quorum_msg_in_view_eq _ _ _ _ Hq) in Hv.
+     apply get_vote_quorum_msg_in_view_eq in Hv.
      split; [|assumption].
      intros [msg' [Hm' Hp]].
      apply message_view_block_eqb in Hp.
