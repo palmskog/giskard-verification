@@ -600,7 +600,9 @@ Definition quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : messa
 Definition quorum_msg_for_block (s : NState) (b : block) (msg : message) : Prop :=
  (b = GenesisBlock /\ msg = GenesisBlock_message s) \/
  (b <> GenesisBlock /\ exists v_prime, v_prime <= node_view s /\
-   prepare_stage_in_view s v_prime b /\ quorum_msg_in_view s v_prime b msg).
+   prepare_stage_in_view s v_prime b /\
+   (forall v0, v_prime < v0 <= node_view s -> ~ prepare_stage_in_view s v0 b) /\
+   quorum_msg_in_view s v_prime b msg).
 
 (** Parent block has reached QC - send PrepareVote for the block in that message and record in out buffer: *) 
 Definition process_PrepareBlock_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=

@@ -134,7 +134,10 @@ Definition get_quorum_msg_in_view (s : NState) (view : nat) (b : block) : option
  end.
 
 Definition get_quorum_msg_for_block (s : NState) (b : block) : option message :=
-None.
+match block_eq_dec GenesisBlock b with
+| left Hdec => Some (GenesisBlock_message s)
+| right Hdec => None
+end.
 
 (* END BASIC STATE FUNCTIONS *)
 
