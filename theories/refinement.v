@@ -7,6 +7,56 @@ Import RecordSetNotations.
 
 Set Implicit Arguments.
 
+(* BEGIN UTILITY *)
+
+Lemma before_refl : forall A (A_eq_dec : forall (a a' : A), {a = a'}+{a <> a'})
+ (x : A) l, In x l -> before x x l.
+Proof.
+intros A A_eq_dec.
+induction l; simpl; auto.
+intros [Ha|Hin].
+- left; assumption.
+- destruct (A_eq_dec a x).
+  * left; assumption.
+  * right.
+    specialize (IHl Hin).
+    split; assumption.
+Qed.
+
+Lemma before_antisymmetric : forall A (x y : A) l,
+ before x y l -> before y x l -> x = y.
+Proof.
+intros; induction l; simpl in *; intuition; congruence.
+Qed.
+
+Lemma find_before : forall A (A_eq_dec : forall (a a' : A), {a = a'}+{a <> a'})
+ (f : A -> bool) (x : A) l, 
+ find f l = Some x ->
+ In x l /\ f x = true /\ (forall y, In y l -> f y = true -> before x y l).
+Proof.
+intros A A_eq_dec f.
+induction l; simpl; [congruence|].
+simpl; case_eq (f a).
+- intros Hfa Ha.
+  inversion Ha; subst.
+  split; [left; reflexivity|].
+  split; [assumption|].
+  intros; left; reflexivity.    
+- intros Hfa Ha.
+  specialize (IHl Ha).
+  destruct IHl as [Hx [Hfx Hb]].
+  split; [right;assumption|].
+  split; [assumption|].
+  intros y Hy Hfy.
+  destruct (A_eq_dec a y); [congruence|].
+  right.
+  split; [assumption|].
+  destruct Hy; [congruence|].    
+  apply Hb; assumption.
+Qed.
+
+(* END UTILITY *)
+
 (* BEGIN BOILERPLATE *)
 
 #[export] Instance message_Settable : Settable _ :=
@@ -259,7 +309,13 @@ Proof.
  split; unfold get_vote_quorum_msg_in_view, vote_quorum_msg_in_view; tauto.
 Qed.
 
-(*
+Lemma message_view_block_eqb : forall mt msg view b,
+ (message_type_eqb (get_message_type msg) mt &&
+  (Nat.eqb (get_view msg) view) && block_eqb (get_block msg) b = true) <->
+ (get_view msg = view /\ get_block msg = b /\ get_message_type msg = mt).
+Proof.
+Admitted.
+
 Lemma get_quorum_msg_in_view_eq : forall s view b msg,
  quorum_msg_in_view s view b msg <-> get_quorum_msg_in_view s view b = Some msg.
 Proof.
@@ -268,12 +324,22 @@ Proof.
  set (f := find _ (counting_messages s)).
  case_eq f.
  - intros msg' Hf.
-   apply find_some in Hf.
-   destruct Hf.
-   Print message.
-   unfold PrepareQC_msg_in_view. 
-Qed.
-*)
+   split; unfold PrepareQC_msg_in_view.
+   * intros [Hm|Hm].
+     + apply find_before in Hf; [|apply message_eq_dec].
+       cut (msg' = msg); [intro H; rewrite H; reflexivity|].
+       destruct Hf as [Hin [Hb Hbef]].
+       destruct Hm as [Hin' [Hv [Hb' [Hm Hbef']]]].
+       apply before_antisymmetric with (l := counting_messages s).
+       -- apply Hbef; [assumption|].
+          apply message_view_block_eqb.
+          tauto.
+       -- apply message_view_block_eqb in Hb.
+          apply Hbef'; tauto.
+     + admit.
+   * admit.
+ - admit.
+Admitted.
 
 Lemma propose_block_init_set_eq : forall s msg s' lm,
  s = NState_init s.(node_id) ->

@@ -5,6 +5,12 @@ Import ListNotations.
 
 Set Implicit Arguments.
 
+Fixpoint final {A} (l : list A) : option A :=
+  match l with [] => None | [x] => Some x | _ :: l => final l end.
+
+Fixpoint before {A} (x : A) y l : Prop :=
+  match l with [] => False | a :: l' => a = x \/ (a <> y /\ before x y l') end.
+
 (** * Local state operations, properties, and transitions *)
 
 (** Local state transitions capture message sending, receiving and processing
@@ -572,9 +578,6 @@ Definition process_PrepareBlock_pending_vote (s : NState) (msg : message) (s' : 
   (* Parent block has not reached Prepare *)
   ~ prepare_stage s (parent_of (get_block msg)). 
 
-Fixpoint final {A} (l : list A) : option A :=
-match l with [] => None | [x] => Some x | _ :: l => final l end.
-
 Definition vote_quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : message) : Prop :=
  quorum (processed_PrepareVote_in_view_about_block s view b) /\
  final (processed_PrepareVote_in_view_about_block s view b) = Some msg.
@@ -583,7 +586,12 @@ Definition PrepareQC_msg_in_view (s : NState) (view : nat) (b : block) (msg : me
   In msg (counting_messages s) /\ 
   get_view msg = view /\
   get_block msg = b /\
-  get_message_type msg = PrepareQC.
+  get_message_type msg = PrepareQC /\
+  (forall msg', In msg' (counting_messages s) ->
+    get_view msg' = view ->
+    get_block msg' = b ->
+    get_message_type msg' = PrepareQC ->
+    before msg msg' (counting_messages s)).
 
 Definition quorum_msg_in_view (s : NState) (view : nat) (b : block) (msg : message) : Prop :=
  PrepareQC_msg_in_view s view b msg \/ vote_quorum_msg_in_view s view b msg.
