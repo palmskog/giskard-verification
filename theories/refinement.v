@@ -55,6 +55,30 @@ simpl; case_eq (f a).
   apply Hb; assumption.
 Qed.
 
+Lemma message_view_block_eqb : forall mt msg view b,
+ (message_type_eqb (get_message_type msg) mt &&
+  (Nat.eqb (get_view msg) view) && block_eqb (get_block msg) b = true) <->
+ (get_view msg = view /\ get_block msg = b /\ get_message_type msg = mt).
+Proof.
+split.
+- intros Hand. 
+  apply andb_true_iff in Hand.
+  destruct Hand as [Hand1 Hand2].
+  apply andb_true_iff in Hand1.
+  destruct Hand1 as [Hand11 Hand12].
+  apply Nat.eqb_eq in Hand12.
+  apply block_eqb_correct in Hand2.
+  apply message_type_eqb_correct in Hand11.
+  tauto.
+- intros [Hg1 [Hg2 Hg3]].
+  apply andb_true_iff.
+  split; [|apply block_eqb_correct; assumption].
+  apply andb_true_iff.
+  split.
+  * apply message_type_eqb_correct; assumption.
+  * apply Nat.eqb_eq; assumption.
+Qed.
+
 (* END UTILITY *)
 
 (* BEGIN BOILERPLATE *)
@@ -304,42 +328,76 @@ Proof. reflexivity. Qed.
 
 Lemma get_vote_quorum_msg_in_view_eq : forall s view b msg,
  quorum (processed_PrepareVote_in_view_about_block s view b) ->
- (vote_quorum_msg_in_view s view b msg <-> get_vote_quorum_msg_in_view s view b = Some msg).
+ (vote_quorum_msg_in_view s view b msg <-> (get_vote_quorum_msg_in_view s view b = Some msg)).
 Proof.
  split; unfold get_vote_quorum_msg_in_view, vote_quorum_msg_in_view; tauto.
 Qed.
 
-Lemma message_view_block_eqb : forall mt msg view b,
- (message_type_eqb (get_message_type msg) mt &&
-  (Nat.eqb (get_view msg) view) && block_eqb (get_block msg) b = true) <->
- (get_view msg = view /\ get_block msg = b /\ get_message_type msg = mt).
-Proof.
-Admitted.
-
 Lemma get_quorum_msg_in_view_eq : forall s view b msg,
- quorum_msg_in_view s view b msg <-> get_quorum_msg_in_view s view b = Some msg.
+ quorum (processed_PrepareVote_in_view_about_block s view b) ->
+ (quorum_msg_in_view s view b msg <-> get_quorum_msg_in_view s view b = Some msg).
 Proof.
- intros s view b msg.
+ intros s view b msg Hq.
  unfold quorum_msg_in_view, get_quorum_msg_in_view.
- set (f := find _ (counting_messages s)).
- case_eq f.
- - intros msg' Hf.
-   split; unfold PrepareQC_msg_in_view.
-   * intros [Hm|Hm].
-     + apply find_before in Hf; [|apply message_eq_dec].
+ set (fm := find _ (counting_messages s)).
+ split.
+ - intros [Hp|Hnp].
+   * case_eq fm.
+     + intros msg' Hfm.
+       apply find_before in Hfm; [|apply message_eq_dec].
        cut (msg' = msg); [intro H; rewrite H; reflexivity|].
-       destruct Hf as [Hin [Hb Hbef]].
-       destruct Hm as [Hin' [Hv [Hb' [Hm Hbef']]]].
+       destruct Hfm as [Hin [Hb Hbef]].
+       destruct Hp as [Hin' [Hv [Hb' [Hm Hbef']]]].
        apply before_antisymmetric with (l := counting_messages s).
        -- apply Hbef; [assumption|].
           apply message_view_block_eqb.
           tauto.
        -- apply message_view_block_eqb in Hb.
           apply Hbef'; tauto.
-     + admit.
-   * admit.
- - admit.
-Admitted.
+     + intros Hfm.
+       pose proof (find_none _ _ Hfm) as Hn.
+       destruct Hp as [Hin' [Hv [Hb' [Hm Hbef']]]].
+       specialize (Hn _ Hin').
+       simpl in Hn.
+       assert (get_view msg = view /\ get_block msg = b /\
+                 get_message_type msg = PrepareQC) as Hb by tauto.
+       apply message_view_block_eqb in Hb.
+       congruence.
+   * destruct Hnp as [Hp Hv].
+     case_eq fm.
+     + intros msg' Hfm.
+       apply find_some in Hfm.
+       destruct Hfm as [Hin Hb].
+       apply message_view_block_eqb in Hb.
+       contradict Hp.
+       exists msg'; tauto.
+     + intros Hfm.
+       apply (proj1 (get_vote_quorum_msg_in_view_eq _ _ _ _ Hq)).
+       assumption.
+ - case_eq fm.
+   * intros msg' Hfm Hm.
+     inversion Hm; subst.
+     left.
+     apply find_before in Hfm; [|apply message_eq_dec].
+     destruct Hfm as [Hin [Hm' Hy]].
+     apply message_view_block_eqb in Hm'.
+     split; [assumption|].
+     split; [tauto|].
+     split; [tauto|].
+     split; [tauto|].
+     intros msg' Hmsg' Hg Hb Ht.
+     apply Hy; [assumption|].
+     apply message_view_block_eqb; tauto.
+   * intros Hfm Hv.
+     right.
+     apply (get_vote_quorum_msg_in_view_eq _ _ _ _ Hq) in Hv.
+     split; [|assumption].
+     intros [msg' [Hm' Hp]].
+     apply message_view_block_eqb in Hp.
+     pose proof (find_none _ _ Hfm msg' Hm') as Hb.
+     simpl in Hb.
+     congruence.
+Qed.
 
 Lemma propose_block_init_set_eq : forall s msg s' lm,
  s = NState_init s.(node_id) ->
