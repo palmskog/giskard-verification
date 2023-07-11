@@ -47,9 +47,17 @@ Definition flip_timeout_set (s : NState) : NState :=
  s <| timeout := true |>.
 
 Definition get_vote_quorum_msg_in_view (s : NState) (view : nat) (b : block) : option message :=
-None.
+ final (processed_PrepareVote_in_view_about_block s view b).
 
-Definition get_quorum_msg_in_view 
+Definition get_quorum_msg_in_view (s : NState) (view : nat) (b : block) : option message :=
+ match
+   find (fun msg => message_type_eqb (get_message_type msg) PrepareQC
+                 && Nat.eqb (get_view msg) view
+                 && block_eqb (get_block msg) b)
+     (counting_messages s) with
+ | Some msg => Some msg
+ | None => get_vote_quorum_msg_in_view s view b
+ end.
 
 Definition get_quorum_msg_for_block (s : NState) (b : block) : option message :=
 None.
@@ -243,6 +251,29 @@ Proof. reflexivity. Qed.
 Lemma flip_timeout_set_eq : forall s,
  flip_timeout s = flip_timeout_set s.
 Proof. reflexivity. Qed.
+
+Lemma get_vote_quorum_msg_in_view_eq : forall s view b msg,
+ quorum (processed_PrepareVote_in_view_about_block s view b) ->
+ (vote_quorum_msg_in_view s view b msg <-> get_vote_quorum_msg_in_view s view b = Some msg).
+Proof.
+ split; unfold get_vote_quorum_msg_in_view, vote_quorum_msg_in_view; tauto.
+Qed.
+
+(*
+Lemma get_quorum_msg_in_view_eq : forall s view b msg,
+ quorum_msg_in_view s view b msg <-> get_quorum_msg_in_view s view b = Some msg.
+Proof.
+ intros s view b msg.
+ unfold quorum_msg_in_view, get_quorum_msg_in_view.
+ set (f := find _ (counting_messages s)).
+ case_eq f.
+ - intros msg' Hf.
+   apply find_some in Hf.
+   destruct Hf.
+   Print message.
+   unfold PrepareQC_msg_in_view. 
+Qed.
+*)
 
 Lemma propose_block_init_set_eq : forall s msg s' lm,
  s = NState_init s.(node_id) ->
