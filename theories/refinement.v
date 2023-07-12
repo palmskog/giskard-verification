@@ -206,18 +206,19 @@ Definition process_PrepareBlock_pending_vote_set (s : NState) (msg : message)
   <| counting_messages := msg :: s.(counting_messages) |>
  in (s', []).
 
-(* BEGIN BROKEN *)
-
 Definition process_PrepareBlock_vote_set (s : NState) (msg : message)
- : NState * list message :=
- let lm := pending_PrepareVote s msg in
- let s' := s
-   <| in_messages := remove message_eq_dec msg s.(in_messages) |>
-   <| counting_messages := msg :: s.(counting_messages) |>
-   <| out_messages := lm ++ s.(out_messages) |>
- in (s', lm).
-
-(* END BROKEN *)
+ : option (NState * list message) :=
+ match get_quorum_msg_for_block s (parent_of (get_block msg)) with
+ | Some quorum_msg =>
+   let s' := s
+    <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+    <| counting_messages := msg :: s.(counting_messages) |>
+   in
+   let lm := pending_PrepareVote s' quorum_msg in
+   let s'' := s' <| out_messages := lm ++ s'.(out_messages) |>
+   in Some (s'', lm)
+ | None => None
+ end.
 
 Definition process_PrepareVote_wait_set (s : NState) (msg : message)
  : NState * list message :=
@@ -639,6 +640,40 @@ split.
   destruct Heq as [Heq Heq'].
   destruct Heq' as [Heq' Heq''].
   subst; reflexivity.
+Qed.
+
+Lemma process_PrepareBlock_vote_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = PrepareBlock ->
+ view_valid s msg ->
+ timeout s = false ->
+ prepare_stage s (parent_of (get_block msg)) ->
+ (process_PrepareBlock_vote_set s msg = Some (s', lm) <->
+   process_PrepareBlock_vote s msg s' lm).
+Proof.
+unfold process_PrepareBlock_vote, process_PrepareBlock_vote_set.
+intros s msg s' lm.
+case_eq (get_quorum_msg_for_block s (parent_of (get_block msg))); split.
+- intros Heq.
+  inversion Heq; subst; clear Heq.
+  apply quorum_msg_for_block_eq in H.
+  exists m; split; [assumption|].
+  split; [reflexivity|].
+  split; [reflexivity|].
+  tauto.
+- intros Heq.
+  destruct Heq as [quorum_msg [Hq Heq]].
+  apply quorum_msg_for_block_eq in Hq.
+  rewrite H in Hq.
+  inversion Hq; subst.
+  destruct Heq as [Hs [Hl Heq]].
+  subst; reflexivity.
+- congruence.
+- intros Heq.
+  destruct Heq as [quorum_msg [Hq Heq]].
+  apply quorum_msg_for_block_eq in Hq.
+  congruence.
 Qed.
 
 (*
