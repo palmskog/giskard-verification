@@ -1,4 +1,4 @@
-From Coq Require Import Arith Bool List.
+From Coq Require Import Arith Bool List Lia.
 From Giskard Require Import structures local.
 From RecordUpdate Require Import RecordSet.
 
@@ -79,6 +79,28 @@ split.
   * apply Nat.eqb_eq; assumption.
 Qed.
 
+Lemma prepare_stage_in_view_eq : forall (s : NState) (view : nat) (b : block),
+ prepare_stage_in_view s view b <-> prepare_stage_in_viewb s view b = true.
+Proof.
+intros s view b; split; unfold prepare_stage_in_view, prepare_stage_in_viewb,
+ vote_quorum_in_view, PrepareQC_in_view, quorum, quorumb, has_at_least_two_thirds.
+- intros [Hh|Hex].
+  * apply orb_true_iff; left; assumption.
+  * apply orb_true_iff; right.
+    destruct Hex as [msg [Hin [Hv [Hb Hm]]]].
+    apply existsb_exists; exists msg.
+    split; [assumption|].
+    apply message_view_block_eqb; tauto.
+- intros Hbe.
+  apply orb_true_iff in Hbe.
+  destruct Hbe as [Hb|He]; [left; assumption|].
+  right.
+  apply existsb_exists in He.
+  destruct He as [msg [Hin Hm]].
+  exists msg; split; [assumption|].
+  apply message_view_block_eqb in Hm; tauto.
+Qed.
+
 (* END UTILITY *)
 
 (* BEGIN BOILERPLATE *)
@@ -135,10 +157,20 @@ Definition get_quorum_msg_in_view (s : NState) (view : nat) (b : block) : option
  | None => get_vote_quorum_msg_in_view s view b
  end.
 
+Fixpoint prepare_stage_in_view_quorum_msg (s : NState) (b : block) (view : nat)
+ : option message :=
+ if prepare_stage_in_viewb s view b then
+  get_quorum_msg_in_view s view b
+ else 
+  match view with
+  | S n => prepare_stage_in_view_quorum_msg s b n
+  | 0 => None
+  end.
+
 Definition get_quorum_msg_for_block (s : NState) (b : block) : option message :=
 match block_eq_dec GenesisBlock b with
 | left Hdec => Some (GenesisBlock_message s)
-| right Hdec => None
+| right Hdec => prepare_stage_in_view_quorum_msg s b (node_view s)
 end.
 
 (* END BASIC STATE FUNCTIONS *)
@@ -409,6 +441,116 @@ Proof.
      pose proof (find_none _ _ Hfm msg' Hm') as Hb.
      simpl in Hb.
      congruence.
+Qed.
+
+Lemma prepare_stage_in_view_quorum_msg_eq : forall n s b msg,
+ (exists v_prime, v_prime <= n /\ prepare_stage_in_view s v_prime b /\
+   (forall v0 : nat, v_prime < v0 <= n -> ~ prepare_stage_in_view s v0 b) /\
+   quorum_msg_in_view s v_prime b msg) <->
+  prepare_stage_in_view_quorum_msg s b n = Some msg.
+Proof.
+induction n; simpl.
+- intros s b msg.
+  split; intros Hq.
+  * destruct Hq as [v_prime [Hp [Hv [Hnp Hq]]]].
+    assert (v_prime = 0) by lia.
+    subst.
+    case_eq (prepare_stage_in_viewb s 0 b).
+    + intros Hpv.
+      apply get_quorum_msg_in_view_eq.
+      assumption.
+    + intros Hpv.
+      apply prepare_stage_in_view_eq in Hv.
+      congruence.
+  * revert Hq.
+    case_eq (prepare_stage_in_viewb s 0 b).
+    + intros Hp Hq.
+      exists 0; split; [lia|].
+      apply prepare_stage_in_view_eq in Hp.
+      split; [assumption|].
+      apply get_quorum_msg_in_view_eq in Hq.
+      split; [|assumption].
+      intros v0 Hv.
+      lia.
+    + intros Hp Hm; congruence.
+- intros s b msg.
+  split; intros Hq.
+  * case_eq (prepare_stage_in_viewb s (S n) b); intros Hp.
+    + apply prepare_stage_in_view_eq in Hp.
+      destruct Hq as [v' [Hv' [Hp' [Hnp' Hq]]]].
+      assert (~ v' < S n) as Hlt. {
+        intros Hvs.
+        assert (v' < S n <= S n) as Hlt by lia.
+        specialize (Hnp' _ Hlt).
+        contradiction.
+      }
+      assert (v' = S n) as Heq by lia.
+      subst.
+      apply get_quorum_msg_in_view_eq; assumption.
+    + assert (~ prepare_stage_in_view s (S n) b) as Hsp'. {
+        intros Hp'.
+        apply prepare_stage_in_view_eq in Hp'.
+        congruence.
+      }
+      destruct Hq as [v' [Hv' [Hp' [Hnp' Hq]]]].
+      assert (v' <= n) as Hvn. {
+        cut (v' <> S n). { lia. }
+        intros Hvs'.
+        subst.
+        contradiction.
+      }
+      apply IHn; exists v'; split; [assumption|].
+      split; [assumption|].
+      split; [|assumption].
+      intros v0 Hv0.
+      apply Hnp'.
+      lia.
+  * revert Hq.
+    case_eq (prepare_stage_in_viewb s (S n) b); intros Hp Hq.
+    + exists (S n); split; [lia|].
+      apply prepare_stage_in_view_eq in Hp.
+      apply get_quorum_msg_in_view_eq in Hq.
+      split; [assumption|].
+      split; [|assumption].
+      intros v0 Hlt.
+      lia.
+    + apply IHn in Hq.
+      assert (~ prepare_stage_in_view s (S n) b) as Hsp'. {
+        intros Hp'.
+        apply prepare_stage_in_view_eq in Hp'.
+        congruence.
+      }
+      destruct Hq as [v' [Hv' [Hp' [Hnp' Hq]]]].
+      exists v'; split; [lia|].
+      split; [assumption|].
+      split; [|assumption].
+      intros v0 Hlt.
+      assert (v0 = S n \/ v' < v0 <= n) as Hv0 by lia.
+      destruct Hv0; [subst; assumption|].
+      apply Hnp'; assumption.
+Qed.
+
+Lemma quorum_msg_for_block_eq : forall s b msg,
+ quorum_msg_for_block s b msg <-> get_quorum_msg_for_block s b = Some msg.
+Proof.
+ intros s b msg.
+ unfold quorum_msg_for_block, get_quorum_msg_for_block.
+ split.
+ - intros Hb.
+   destruct (block_eq_dec GenesisBlock b) as [Hg|Hg].
+   * destruct Hb as [[Hb Hm]|[Hb Hm]]; [|congruence].
+     rewrite Hm; reflexivity.
+   * destruct Hb as [[Hb Hm]|[Hb Hm]]; [congruence|].
+     clear Hb Hg.
+     revert Hm.
+     apply prepare_stage_in_view_quorum_msg_eq.
+ - destruct (block_eq_dec GenesisBlock b) as [Hg|Hg].
+   * intros Hm.
+     inversion Hm; subst.
+     tauto.
+   * intros Hm.
+     right; split; [congruence|].
+     apply prepare_stage_in_view_quorum_msg_eq; assumption.
 Qed.
 
 Lemma propose_block_init_set_eq : forall s msg s' lm,
