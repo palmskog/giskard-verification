@@ -236,21 +236,23 @@ Definition process_PrepareVote_vote_set (s : NState) (msg : message)
   <| counting_messages := msg :: s.(counting_messages) |>
  in (s', lm).
 
-(* BEGIN BROKEN *)
-
 Definition process_PrepareQC_last_block_new_proposer_set (s : NState) (msg : message)
- : NState * list message :=
- let lm := make_PrepareBlocks (increment_view (process_set s msg)) msg in
- let s' := s
-  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
-  <| counting_messages := msg :: s.(counting_messages) |>
-  <| node_view := S (node_view s) |>
-  <| in_messages := [] |>
-  <| timeout := false |>
-  <| out_messages := lm ++ s.(out_messages) |>
- in (s', lm).
-
-(* END BROKEN *)
+ : option (NState * list message) :=
+ match get_quorum_msg_for_block s (parent_of (get_block msg)) with
+ | Some quorum_msg =>
+   let s' := s
+    <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+    <| counting_messages := msg :: s.(counting_messages) |>
+    <| node_view := S (node_view s) |>
+   in
+   let lm := make_PrepareBlocks s' quorum_msg in
+   let s'' := s'
+    <| in_messages := [] |>
+    <| timeout := false |>
+    <| out_messages := lm ++ s.(out_messages) |>
+   in Some (s'', lm)
+ | None => None
+ end.
 
 Definition process_PrepareQC_last_block_set (s : NState) (msg : message)
  : NState * list message :=
@@ -676,28 +678,6 @@ case_eq (get_quorum_msg_for_block s (parent_of (get_block msg))); split.
   congruence.
 Qed.
 
-(*
-Lemma process_PrepareBlock_vote_set_eq : forall s msg s' lm,
- received s msg ->
- honest_node (node_id s) ->
- get_message_type msg = PrepareBlock ->
- view_valid s msg ->
- timeout s = false ->
- prepare_stage s (parent_of (get_block msg)) ->
- (process_PrepareBlock_vote_set s msg = (s', lm) <->
-   process_PrepareBlock_vote s msg s' lm).
-Proof.
-unfold process_PrepareBlock_vote, process_PrepareBlock_vote_set.
-split.
-- intros Heq; inversion Heq; subst.
-  tauto.
-- intros Heq.
-  destruct Heq as [Heq Heq'].
-  destruct Heq' as [Heq' Heq''].
-  subst; reflexivity.
-Qed.
-*)
-
 Lemma process_PrepareVote_wait_set_eq : forall s msg s' lm,
  received s msg ->
  honest_node s.(node_id) ->
@@ -739,26 +719,39 @@ split.
   subst; reflexivity.
 Qed.
 
-(*
 Lemma process_PrepareQC_last_block_new_proposer_eq : forall s msg s' lm,
  received s msg ->
  honest_node (node_id s) ->
  get_message_type msg = PrepareQC ->
  view_valid s msg ->
- last_block (get_block msg) /\ is_block_proposer (node_id s) (S (node_view s)) ->
- (process_PrepareQC_last_block_new_proposer_set s msg = (s', lm) <->
+ last_block (get_block msg) ->
+ is_block_proposer (node_id s) (S (node_view s)) ->
+ (process_PrepareQC_last_block_new_proposer_set s msg = Some (s', lm) <->
    process_PrepareQC_last_block_new_proposer s msg s' lm).
 Proof.
 unfold process_PrepareQC_last_block_new_proposer_set,process_PrepareQC_last_block_new_proposer.
-split.
-- intros Heq; inversion Heq; subst.
+intros s msg s' lm.
+case_eq (get_quorum_msg_for_block s (parent_of (get_block msg))); split.
+- intros Heq.
+  inversion Heq; subst; clear Heq.
+  apply quorum_msg_for_block_eq in H.
+  exists m; split; [assumption|].
+  split; [reflexivity|].
+  split; [reflexivity|].
   tauto.
 - intros Heq.
-  destruct Heq as [Heq Heq'].
-  destruct Heq' as [Heq' Heq''].
+  destruct Heq as [quorum_msg [Hq Heq]].
+  apply quorum_msg_for_block_eq in Hq.
+  rewrite H in Hq.
+  inversion Hq; subst.
+  destruct Heq as [Hs [Hl Heq]].
   subst; reflexivity.
+- congruence.
+- intros Heq.
+  destruct Heq as [quorum_msg [Hq Heq]].
+  apply quorum_msg_for_block_eq in Hq.
+  congruence.
 Qed.
-*)
 
 Lemma process_PrepareQC_last_block_set_eq : forall s msg s' lm,
  received s msg ->
