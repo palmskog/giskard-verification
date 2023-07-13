@@ -297,6 +297,13 @@ Definition process_ViewChange_quorum_new_proposer_set (s : NState) (msg : messag
    <| out_messages := lm ++ s'.(out_messages) |>
  in (s'', lm).
 
+Definition process_ViewChange_quorum_not_new_proposer_set (s : NState) (msg : message)
+ : NState * list message :=
+ let s' := s
+   <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+   <| counting_messages := msg :: s.(counting_messages) |>
+ in (s', []).
+
 Definition process_ViewChange_pre_quorum_set (s : NState) (msg : message)
  : NState * list message :=
  let s' := s
@@ -813,6 +820,27 @@ split.
   destruct Heq' as [Heq' Heq''].
   subst; reflexivity.
 Qed.
+
+Lemma process_ViewChange_quorum_not_new_proposer_set_eq : forall s msg s' lm,
+ received s msg ->
+ honest_node (node_id s) ->
+ get_message_type msg = ViewChange ->
+ view_valid s msg ->
+ view_change_quorum_in_view (process s msg) (node_view s) ->
+  ~ is_block_proposer (node_id s) (S (node_view s)) ->
+ (process_ViewChange_quorum_not_new_proposer_set s msg = (s', lm) <->
+  process_ViewChange_quorum_not_new_proposer s msg s' lm).
+Proof.
+unfold process_ViewChange_quorum_not_new_proposer_set,process_ViewChange_quorum_not_new_proposer.
+split.
+- intros Heq; inversion Heq; subst.
+  split; [admit|].
+  split; [admit|].
+  tauto.
+- intros Heq.
+  destruct Heq as [Hs [Hl Heq]].
+  subst; admit.
+Admitted.
 
 Lemma process_ViewChange_pre_quorum_set_eq : forall s msg s' lm,
  received s msg ->
