@@ -675,19 +675,21 @@ Definition prepare_qc_already_sent (s : NState) (b : block) : bool :=
             and Giskard.vote_quorum_in_view(Giskard.process(state, msg), msg.view, msg.block, peers)
 *)
 Definition process_PrepareVote_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
-  s' = process
-         (record_plural
-            s
-            ((make_PrepareQC s msg) :: pending_PrepareVote s msg))
-         msg /\
-  lm = (make_PrepareQC s msg) :: pending_PrepareVote s msg /\
+  let lm_prime :=
+    if negb (prepare_qc_already_sent s (get_block msg)) then
+      make_PrepareQC s msg :: pending_PrepareVote s msg
+    else
+      pending_PrepareVote s msg
+  in
+  (Forall (fun m => ~ exists_same_height_block s (get_block m)) lm_prime) /\
+  s' = process (record_plural s lm_prime) msg /\
+  lm = lm_prime /\
   honest_node (node_id s) /\ 
   received s msg /\
   get_message_type msg = PrepareVote /\
   view_valid s msg /\
   (* PrepareVotes cannot be processed during timeout *) 
   timeout s = false /\
-  ~ exists_same_height_block s (get_block msg) /\
   vote_quorum_in_view (process s msg) (get_view msg) (get_block msg). 
 
 (** *** PrepareQC message-related actions *)
@@ -1153,6 +1155,11 @@ Proof.
     try (destruct H_step_copy as [? [_ [H_init _]]]; 
          rewrite H_init;
          apply in_app_iff; right; assumption).
+    destruct H_step_copy as [_ [H_init _]].
+    rewrite H_init.
+    simpl.
+    apply in_app_iff.
+    right; assumption.
 Qed. 
 
 Lemma counting_messages_same_view_monotonic :
@@ -1172,6 +1179,9 @@ Proof.
     try (destruct H_step as [H_subst _];
          subst; right; right; assumption).
   - destruct H_step as [? [_ [H_subst _]]].
+    rewrite H_subst in *; simpl.
+    right; assumption.
+  - destruct H_step as [_ [H_subst _]].
     rewrite H_subst in *; simpl.
     right; assumption.
   - destruct H_step as [? [_ [H_subst _]]].
@@ -1204,6 +1214,10 @@ Proof.
     rewrite H_subst; simpl.
     right; assumption.
   - clear H_subst.
+    destruct H_step_copy as [_ [H_subst _]].
+    rewrite H_subst; simpl.
+    right; assumption.
+  - clear H_subst.
     destruct H_step_copy as [? [_ [H_subst _]]].
     rewrite H_subst; simpl.
     right; assumption.
@@ -1233,6 +1247,10 @@ Proof.
          destruct H_in as [H_in | [H_in | [H_in | H_in]]];
          tauto). 
   - clear H_update H_out; destruct H_step_copy as [? [_ [H_update [H_out _]]]].
+    rewrite H_update; simpl.
+    rewrite H_out in H_in.
+    apply in_app_iff; left; assumption.
+  - clear H_update H_out; destruct H_step_copy as [_ [H_update [H_out _]]].
     rewrite H_update; simpl.
     rewrite H_out in H_in.
     apply in_app_iff; left; assumption.

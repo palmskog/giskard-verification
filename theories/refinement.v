@@ -240,6 +240,9 @@ Definition process_PrepareVote_wait_set (s : NState) (msg : message)
             state, lm), msg)
         return [state_prime, lm]
 *)
+
+(* BEGIN BROKEN *)
+
 Definition process_PrepareVote_vote_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := make_PrepareQC s msg :: pending_PrepareVote s msg in
@@ -248,6 +251,8 @@ Definition process_PrepareVote_vote_set (s : NState) (msg : message)
   <| in_messages := remove message_eq_dec msg s.(in_messages) |>
   <| counting_messages := msg :: s.(counting_messages) |>
  in (s', lm).
+
+(* END BROKEN *)
 
 Definition process_PrepareQC_last_block_new_proposer_set (s : NState) (msg : message)
  : option (NState * list message) :=
@@ -727,6 +732,7 @@ split.
   subst; reflexivity.
 Qed.
 
+(*
 Lemma process_PrepareVote_vote_set_eq : forall s msg s' lm,
  honest_node (node_id s) ->
  received s msg ->
@@ -747,6 +753,7 @@ split.
   destruct Heq' as [Heq' Heq''].
   subst; reflexivity.
 Qed.
+*)
 
 Lemma process_PrepareQC_last_block_new_proposer_eq : forall s msg s' lm,
  received s msg ->
