@@ -342,6 +342,25 @@ Definition malicious_ignore_set (s : NState) (msg : message)
  let s' := s <| in_messages := remove message_eq_dec msg s.(in_messages) |> in
  (s', []).
 
+(*
+    @staticmethod
+    def process_PrepareBlock_malicious_vote_set(state: NState, msg: GiskardMessage,
+                                                block_cache, peers) -> [NState, List[GiskardMessage]]:
+        quorum_msg = Giskard.adhoc_ParentBlockQC_msg(state, GiskardGenesisBlock())
+        if GiskardGenesisBlock() == msg.block:
+            parent_block = GiskardGenesisBlock()
+        else:
+            parent_block = block_cache.block_store.get_parent_block(msg.block)
+        if parent_block is not None and Giskard.prepare_stage(state, parent_block, peers):
+            quorum_msg = Giskard.get_quorum_msg_for_block(state, parent_block, peers)
+        elif msg.block.block_num - 1 == msg.piggyback_block.block_num \
+                and msg.block.previous_id == msg.piggyback_block.block_id:
+            parent_block = msg.piggyback_block
+            quorum_msg = Giskard.adhoc_ParentBlockQC_msg(state, parent_block)
+        lm = Giskard.pending_PrepareVote_malicious(Giskard.process(state, msg), quorum_msg, block_cache)
+        state_prime = Giskard.record_plural(Giskard.process(state, msg), lm)
+        return [state_prime, lm]
+*)
 Definition process_PrepareBlock_malicious_vote_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := pending_PrepareVote s msg in

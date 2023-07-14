@@ -1053,6 +1053,30 @@ Definition process_ViewChange_pre_quorum (s : NState) (msg : message) (s' : NSta
 
 (** Critically, this is where we enforce that the PrepareQC of the max height block
 is processed before view change occurs, otherwise nodes can get stuck during view change. *)
+(*
+    @staticmethod
+    def process_ViewChangeQC_single(state: NState, msg: GiskardMessage,
+                                    state_prime: NState, lm: List[GiskardMessage],
+                                    node) -> bool:
+        """ Process highest PrepareQC message, process ViewChangeQC, then increment view.
+        Critically, this is where we enforce that the PrepareQC of the max height block
+        is processed before view change occurs, otherwise nodes can get stuck during view change. """
+        """ CHANGE from the original specification
+        removed and Giskard.received(state, GiskardMessage(GiskardMessage.CONSENSUS_GISKARD_PREPARE_QC,
+                                                       state.node_view,
+                                                       msg.sender,
+                                                       msg.block,
+                                                       GiskardGenesisBlock())) \
+        could be that not received yet, due to network problems -> out of order messages """
+        return state_prime == \
+            Giskard.increment_view(
+                Giskard.process(state, msg)) \
+            and lm == [] \
+            and Giskard.received(state, msg) \
+            and Giskard.honest_node(node) \
+            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_VIEW_CHANGE_QC \
+            and Giskard.view_valid(state, msg)
+*)
 Definition process_ViewChangeQC_single (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
   s' = increment_view (process (process s
     (mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock)) msg) /\
@@ -1081,6 +1105,35 @@ Definition malicious_ignore (s : NState) (msg : message) (s' : NState) (lm : lis
   ~ honest_node (node_id s).
 
 (** Malicious nodes can double vote for two blocks of the same height: *)
+(*
+    @staticmethod
+    def process_PrepareBlock_malicious_vote(state: NState, msg: GiskardMessage,
+                                            state_prime: NState, lm: List[GiskardMessage],
+                                            node, block_cache, peers) -> bool:
+        """ Malicious nodes can double vote for two blocks of the same height """
+        """ CHANGE from the original specification
+        extra pending_PrepareVote function, as the honest one also checks for exists same height block """
+        quorum_msg = Giskard.adhoc_ParentBlockQC_msg(state, GiskardGenesisBlock())
+        if GiskardGenesisBlock() == msg.block:
+            parent_block = GiskardGenesisBlock()
+        else:
+            parent_block = block_cache.block_store.get_parent_block(msg.block)
+        if parent_block is not None and Giskard.prepare_stage(state, parent_block, peers):
+            quorum_msg = Giskard.get_quorum_msg_for_block(state, parent_block, peers)
+        elif msg.block.block_num - 1 == msg.piggyback_block.block_num \
+                and msg.block.previous_id == msg.piggyback_block.block_id:
+            parent_block = msg.piggyback_block
+            quorum_msg = Giskard.adhoc_ParentBlockQC_msg(state, parent_block)
+        lm_prime = Giskard.pending_PrepareVote_malicious(Giskard.process(state, msg), quorum_msg, block_cache)
+        return state_prime == Giskard.record_plural(Giskard.process(state, msg),
+                                                    lm_prime) \
+            and lm == lm_prime \
+            and Giskard.received(state, msg) \
+            and not Giskard.honest_node(node) \
+            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_BLOCK \
+            and Giskard.view_valid(state, msg) \
+            and Giskard.exists_same_height_block(state, msg.block)
+*)
 Definition process_PrepareBlock_malicious_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
   s' = record_plural (process s msg) (pending_PrepareVote s msg) /\
   lm = pending_PrepareVote s msg /\
