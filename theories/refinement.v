@@ -315,7 +315,16 @@ Definition process_ViewChange_quorum_not_new_proposer_set (s : NState) (msg : me
  let s' := s
    <| in_messages := remove message_eq_dec msg s.(in_messages) |>
    <| counting_messages := msg :: s.(counting_messages) |>
- in (s', []).
+ in
+ let msg_vc := highest_ViewChange_message s' in
+ let lm_prime :=
+   if negb (prepare_qc_already_sent s (get_block msg_vc)) then
+     [make_PrepareQC s msg; make_ViewChangeQC s' msg_vc]
+   else
+     [make_ViewChangeQC s' msg_vc]
+ in
+ let s'' := s' <| out_messages := lm_prime ++ s'.(out_messages) |>
+ in (s'', lm_prime).
 
 Definition process_ViewChange_pre_quorum_set (s : NState) (msg : message)
  : NState * list message :=
@@ -847,13 +856,13 @@ Proof.
 unfold process_ViewChange_quorum_not_new_proposer_set,process_ViewChange_quorum_not_new_proposer.
 split.
 - intros Heq; inversion Heq; subst.
-  split; [admit|].
-  split; [admit|].
+  split; [reflexivity|].
+  split; [reflexivity|].
   tauto.
 - intros Heq.
   destruct Heq as [Hs [Hl Heq]].
-  subst; admit.
-Admitted.
+  subst; reflexivity.
+Qed.
 
 Lemma process_ViewChange_pre_quorum_set_eq : forall s msg s' lm,
  received s msg ->

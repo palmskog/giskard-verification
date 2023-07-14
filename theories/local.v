@@ -828,32 +828,6 @@ Qed.
 Definition highest_ViewChange_message (s : NState) : message :=
   highest_message_in_list (node_id s) ViewChange (processed_ViewChange_in_view s (node_view s)).
 
-(*
-    @staticmethod
-    def process_ViewChange_quorum_not_new_proposer(state: NState, msg: GiskardMessage,
-                                                   state_prime: NState, lm: List[GiskardMessage],
-                                                   node, peers) -> bool:
-        """ Process ViewChange quorum reached,
-        process and wait for receiving a ViewChangeQC msg from the next proposer """
-        """ CHANGE from the original specification
-        transition doesn't exist there, probably forgotten
-        Needed for successful transition tests, as this transition happens """
-        msg_vc = Giskard.highest_ViewChange_message(Giskard.process(state, msg))
-        lm_prime = []
-        if not Giskard.prepare_qc_already_sent(state, msg_vc.block):
-            msg_pr = Giskard.make_PrepareQC(state, msg_vc)
-            lm_prime.append(msg_pr)
-        lm_prime.append(Giskard.make_ViewChangeQC(Giskard.process(state, msg), msg_vc))
-        return state_prime == Giskard.record_plural(Giskard.process(state, msg), lm_prime) \
-            and lm == lm_prime \
-            and Giskard.received(state, msg) \
-            and Giskard.honest_node(node) \
-            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_VIEW_CHANGE \
-            and Giskard.view_valid(state, msg) \
-            and Giskard.view_change_quorum_in_view(
-                Giskard.process(state, msg), state.node_view, peers) \
-            and not Giskard.is_block_proposer(node, state.node_view + 1, peers)
-*)
 Definition process_ViewChange_quorum_not_new_proposer
  (s: NState) (msg : message) (s': NState) (lm: list message) : Prop :=
   let msg_vc := highest_ViewChange_message (process s msg) in
