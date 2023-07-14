@@ -227,32 +227,19 @@ Definition process_PrepareVote_wait_set (s : NState) (msg : message)
   <| counting_messages := msg :: s.(counting_messages) |>
  in (s', []).
 
-(*
-    @staticmethod
-    def process_PrepareVote_vote_set(state: NState, msg: GiskardMessage, block_cache) -> [NState, List[GiskardMessage]]:
-        """ CHANGE from the original specification
-        checking for prepareQC already sent, to avoid too many messages """
-        lm = []
-        if not Giskard.prepare_qc_already_sent(state, msg.block):
-            lm.append(Giskard.make_PrepareQC(state, msg))
-        lm = lm + Giskard.pending_PrepareVote(state, msg, block_cache)
-        state_prime = Giskard.process(Giskard.record_plural(
-            state, lm), msg)
-        return [state_prime, lm]
-*)
-
-(* BEGIN BROKEN *)
-
 Definition process_PrepareVote_vote_set (s : NState) (msg : message)
  : NState * list message :=
- let lm := make_PrepareQC s msg :: pending_PrepareVote s msg in
- let s' := s
-  <| out_messages := lm ++ s.(out_messages) |>
-  <| in_messages := remove message_eq_dec msg s.(in_messages) |>
-  <| counting_messages := msg :: s.(counting_messages) |>
- in (s', lm).
-
-(* END BROKEN *)
+  let lm_prime :=
+    if negb (prepare_qc_already_sent s (get_block msg)) then
+      make_PrepareQC s msg :: pending_PrepareVote s msg
+    else
+      pending_PrepareVote s msg
+  in
+  let s' := s
+    <| in_messages := remove message_eq_dec msg s.(in_messages) |>
+    <| counting_messages := msg :: s.(counting_messages) |>
+    <| out_messages := lm_prime ++ s.(out_messages) |>
+ in (s', lm_prime).
 
 Definition process_PrepareQC_last_block_new_proposer_set (s : NState) (msg : message)
  : option (NState * list message) :=
@@ -732,14 +719,13 @@ split.
   subst; reflexivity.
 Qed.
 
-(*
 Lemma process_PrepareVote_vote_set_eq : forall s msg s' lm,
  honest_node (node_id s) ->
  received s msg ->
  get_message_type msg = PrepareVote ->
  view_valid s msg ->
  timeout s = false ->
- ~ exists_same_height_block s (get_block msg) ->
+ (Forall (fun m => ~ exists_same_height_block s (get_block m)) lm) ->
  vote_quorum_in_view (process s msg) (get_view msg) (get_block msg) ->
  (process_PrepareVote_vote_set s msg = (s', lm) <->
    process_PrepareVote_vote s msg s' lm).
@@ -749,11 +735,9 @@ split.
 - intros Heq; inversion Heq; subst.
   tauto.
 - intros Heq.
-  destruct Heq as [Heq Heq'].
-  destruct Heq' as [Heq' Heq''].
+  destruct Heq as [Hl [Hs [Hlm Heq]]].
   subst; reflexivity.
 Qed.
-*)
 
 Lemma process_PrepareQC_last_block_new_proposer_eq : forall s msg s' lm,
  received s msg ->
