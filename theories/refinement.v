@@ -227,6 +227,19 @@ Definition process_PrepareVote_wait_set (s : NState) (msg : message)
   <| counting_messages := msg :: s.(counting_messages) |>
  in (s', []).
 
+(*
+    @staticmethod
+    def process_PrepareVote_vote_set(state: NState, msg: GiskardMessage, block_cache) -> [NState, List[GiskardMessage]]:
+        """ CHANGE from the original specification
+        checking for prepareQC already sent, to avoid too many messages """
+        lm = []
+        if not Giskard.prepare_qc_already_sent(state, msg.block):
+            lm.append(Giskard.make_PrepareQC(state, msg))
+        lm = lm + Giskard.pending_PrepareVote(state, msg, block_cache)
+        state_prime = Giskard.process(Giskard.record_plural(
+            state, lm), msg)
+        return [state_prime, lm]
+*)
 Definition process_PrepareVote_vote_set (s : NState) (msg : message)
  : NState * list message :=
  let lm := make_PrepareQC s msg :: pending_PrepareVote s msg in

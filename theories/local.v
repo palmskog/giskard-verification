@@ -634,8 +634,46 @@ Definition process_PrepareVote_wait (s : NState) (msg : message) (s' : NState) (
   timeout s = false /\ 
   ~ prepare_stage (process s msg) (get_block msg). 
 
+Definition prepare_qc_already_sent (s : NState) (b : block) : bool :=
+ existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareQC &&
+                              block_eqb (get_block msg) b &&
+                              Nat.eqb (get_view msg) (node_view s))
+ (out_messages s).
+
 (** Block is about to reach QC - send PrepareVote messages for child block if it exists and send PrepareQC: *)
 (* vote_quorum means quorum PrepareVote messages *)
+(*
+    @staticmethod
+    def process_PrepareVote_vote(state: NState, msg: GiskardMessage,
+                                 state_prime: NState, lm: List[GiskardMessage], node, block_cache, peers) -> bool:
+        """ Block is about to reach QC - send PrepareVote messages for child block if it exists and send PrepareQC
+        vote_quorum means quorum PrepareVote messages """
+        """ CHANGE from the original specification
+        it only makes sense here to check if there is a same height block
+        for the prepareVote msgs that we will be sending out """
+        """ CHANGE from the original specification
+        checking for prepareQC already sent, to avoid too many messages """
+        # TODO is checking in the out_messages enough with exists_same_height_block ?
+        lm_prime = []
+        if not Giskard.prepare_qc_already_sent(state, msg.block):
+            lm_prime.append(Giskard.make_PrepareQC(state, msg))
+        lm_prime = lm_prime + Giskard.pending_PrepareVote(state, msg, block_cache)
+        for m in lm_prime:
+            if m.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_VOTE:
+                if Giskard.exists_same_height_block(state, m.block):
+                    return False
+        return state_prime == \
+            Giskard.process(Giskard.record_plural(
+                state, lm_prime),
+                msg) \
+            and lm == lm_prime \
+            and Giskard.received(state, msg) \
+            and Giskard.honest_node(node) \
+            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_VOTE \
+            and Giskard.view_valid(state, msg) \
+            and not state.timeout \
+            and Giskard.vote_quorum_in_view(Giskard.process(state, msg), msg.view, msg.block, peers)
+*)
 Definition process_PrepareVote_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
   s' = process
          (record_plural
@@ -790,12 +828,32 @@ Qed.
 Definition highest_ViewChange_message (s : NState) : message :=
   highest_message_in_list (node_id s) ViewChange (processed_ViewChange_in_view s (node_view s)).
 
-Definition prepare_qc_already_sent (s : NState) (b : block) : bool :=
- existsb (fun (msg : message) => message_type_eqb (get_message_type msg) PrepareQC &&
-                              block_eqb (get_block msg) b &&
-                              Nat.eqb (get_view msg) (node_view s))
- (out_messages s).
-
+(*
+    @staticmethod
+    def process_ViewChange_quorum_not_new_proposer(state: NState, msg: GiskardMessage,
+                                                   state_prime: NState, lm: List[GiskardMessage],
+                                                   node, peers) -> bool:
+        """ Process ViewChange quorum reached,
+        process and wait for receiving a ViewChangeQC msg from the next proposer """
+        """ CHANGE from the original specification
+        transition doesn't exist there, probably forgotten
+        Needed for successful transition tests, as this transition happens """
+        msg_vc = Giskard.highest_ViewChange_message(Giskard.process(state, msg))
+        lm_prime = []
+        if not Giskard.prepare_qc_already_sent(state, msg_vc.block):
+            msg_pr = Giskard.make_PrepareQC(state, msg_vc)
+            lm_prime.append(msg_pr)
+        lm_prime.append(Giskard.make_ViewChangeQC(Giskard.process(state, msg), msg_vc))
+        return state_prime == Giskard.record_plural(Giskard.process(state, msg), lm_prime) \
+            and lm == lm_prime \
+            and Giskard.received(state, msg) \
+            and Giskard.honest_node(node) \
+            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_VIEW_CHANGE \
+            and Giskard.view_valid(state, msg) \
+            and Giskard.view_change_quorum_in_view(
+                Giskard.process(state, msg), state.node_view, peers) \
+            and not Giskard.is_block_proposer(node, state.node_view + 1, peers)
+*)
 Definition process_ViewChange_quorum_not_new_proposer
  (s: NState) (msg : message) (s': NState) (lm: list message) : Prop :=
   let msg_vc := highest_ViewChange_message (process s msg) in
