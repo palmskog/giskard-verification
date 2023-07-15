@@ -1021,30 +1021,6 @@ Definition process_ViewChange_pre_quorum (s : NState) (msg : message) (s' : NSta
 
 (** Critically, this is where we enforce that the PrepareQC of the max height block
 is processed before view change occurs, otherwise nodes can get stuck during view change. *)
-(*
-    @staticmethod
-    def process_ViewChangeQC_single(state: NState, msg: GiskardMessage,
-                                    state_prime: NState, lm: List[GiskardMessage],
-                                    node) -> bool:
-        """ Process highest PrepareQC message, process ViewChangeQC, then increment view.
-        Critically, this is where we enforce that the PrepareQC of the max height block
-        is processed before view change occurs, otherwise nodes can get stuck during view change. """
-        """ CHANGE from the original specification
-        removed and Giskard.received(state, GiskardMessage(GiskardMessage.CONSENSUS_GISKARD_PREPARE_QC,
-                                                       state.node_view,
-                                                       msg.sender,
-                                                       msg.block,
-                                                       GiskardGenesisBlock())) \
-        could be that not received yet, due to network problems -> out of order messages """
-        return state_prime == \
-            Giskard.increment_view(
-                Giskard.process(state, msg)) \
-            and lm == [] \
-            and Giskard.received(state, msg) \
-            and Giskard.honest_node(node) \
-            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_VIEW_CHANGE_QC \
-            and Giskard.view_valid(state, msg)
-*)
 Definition process_ViewChangeQC_single (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
   s' = increment_view (process s msg) /\
   lm = [] /\
@@ -1070,24 +1046,6 @@ Definition malicious_ignore (s : NState) (msg : message) (s' : NState) (lm : lis
   received s msg /\
   ~ honest_node (node_id s).
 
-(*
-    @staticmethod
-    def pending_PrepareVote_malicious(state: NState, quorum_msg: GiskardMessage, block_cache) -> List[GiskardMessage]:
-        """ Extra function, as original specification would not maliciously vote for a block,
-        as the original pending_PrepareVote checks for exists_same_height_block """
-        """ CHANGE from the original specification
-        here do I check for if a prepare vote has been already sent,
-        this check is nowhere to be found in the coq code"""
-        """ CHANGE from the original specification
-        lambda msg: msg.view == quorum_msg.view removed, why is that there makes no sense,
-        hinders voting for the first block of a new view"""
-        return list(map(lambda prepare_block_msg:
-                        Giskard.make_PrepareVote(state, quorum_msg, prepare_block_msg),
-                        filter(lambda msg: Giskard.parent_ofb(msg.block, quorum_msg.block, block_cache)
-                                           and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_BLOCK
-                                           and not Giskard.prepare_vote_already_sent(state, msg.block),
-                              state.counting_messages)))
-*)
 Definition pending_PrepareVote_malicious (s : NState) (quorum_msg : message) : list message :=
  map (fun prepare_block_msg => make_PrepareVote s quorum_msg prepare_block_msg)
      (filter (fun msg => parent_ofb (get_block msg) (get_block quorum_msg) &&
@@ -1096,35 +1054,6 @@ Definition pending_PrepareVote_malicious (s : NState) (quorum_msg : message) : l
              (counting_messages s)).
 
 (** Malicious nodes can double vote for two blocks of the same height: *)
-(*
-    @staticmethod
-    def process_PrepareBlock_malicious_vote(state: NState, msg: GiskardMessage,
-                                            state_prime: NState, lm: List[GiskardMessage],
-                                            node, block_cache, peers) -> bool:
-        """ Malicious nodes can double vote for two blocks of the same height """
-        """ CHANGE from the original specification
-        extra pending_PrepareVote function, as the honest one also checks for exists same height block """
-        quorum_msg = Giskard.adhoc_ParentBlockQC_msg(state, GiskardGenesisBlock())
-        if GiskardGenesisBlock() == msg.block:
-            parent_block = GiskardGenesisBlock()
-        else:
-            parent_block = block_cache.block_store.get_parent_block(msg.block)
-        if parent_block is not None and Giskard.prepare_stage(state, parent_block, peers):
-            quorum_msg = Giskard.get_quorum_msg_for_block(state, parent_block, peers)
-        elif msg.block.block_num - 1 == msg.piggyback_block.block_num \
-                and msg.block.previous_id == msg.piggyback_block.block_id:
-            parent_block = msg.piggyback_block
-            quorum_msg = Giskard.adhoc_ParentBlockQC_msg(state, parent_block)
-        lm_prime = Giskard.pending_PrepareVote_malicious(Giskard.process(state, msg), quorum_msg, block_cache)
-        return state_prime == Giskard.record_plural(Giskard.process(state, msg),
-                                                    lm_prime) \
-            and lm == lm_prime \
-            and Giskard.received(state, msg) \
-            and not Giskard.honest_node(node) \
-            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_BLOCK \
-            and Giskard.view_valid(state, msg) \
-            and Giskard.exists_same_height_block(state, msg.block)
-*)
 Definition process_PrepareBlock_malicious_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
   exists quorum_msg, quorum_msg_for_block s (parent_of (get_block msg)) quorum_msg /\
   s' = record_plural (process s msg) (pending_PrepareVote_malicious (process s msg) quorum_msg) /\
