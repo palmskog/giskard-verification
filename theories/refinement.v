@@ -779,7 +779,6 @@ Lemma process_PrepareQC_last_block_set_eq : forall s msg s' lm,
  honest_node (node_id s) ->
  get_message_type msg = PrepareQC ->
  view_valid s msg ->
- last_block (get_block msg) ->
  ~ is_block_proposer (node_id s) (S (node_view s)) ->
  (process_PrepareQC_last_block_set s msg = (s', lm) <->
   process_PrepareQC_last_block s msg s' lm).

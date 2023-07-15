@@ -703,7 +703,6 @@ Definition process_PrepareQC_last_block (s : NState) (msg : message) (s' : NStat
   view_valid s msg /\
   (* Here we don't need for timeout to be false because apparently
      we can still process PrepareQC messages in the timeout period *)
-  last_block (get_block msg) /\
   ~ is_block_proposer (node_id s) (S (node_view s)).
 
 (** Not-the-last block in the view - send PrepareVote messages for child block and wait: *)
