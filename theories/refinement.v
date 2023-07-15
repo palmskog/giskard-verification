@@ -814,8 +814,6 @@ Qed.
 
 Lemma process_ViewChange_quorum_new_proposer_set_eq : forall s msg s' lm,
  received s msg ->
- received s (mkMessage PrepareQC (get_view msg) (get_sender msg)
-  (get_block (highest_ViewChange_message (process s msg))) GenesisBlock) ->
  honest_node (node_id s) ->
  get_message_type msg = ViewChange ->
  view_valid s msg ->

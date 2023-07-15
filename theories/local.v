@@ -991,9 +991,6 @@ Definition process_ViewChange_quorum_new_proposer
   (* Send PrepareBlock messages *) 
   (make_PrepareBlocks (increment_view s) (highest_ViewChange_message (process s msg))) /\
   received s msg /\
-  (* This condition is necessary given ViewChange sending behavior *) 
-  received s (mkMessage PrepareQC (get_view msg) (get_sender msg)
-   (get_block (highest_ViewChange_message (process s msg))) GenesisBlock) /\ 
   honest_node (node_id s) /\ 
   get_message_type msg = ViewChange /\
   view_valid s msg /\
