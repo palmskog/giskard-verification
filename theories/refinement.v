@@ -798,7 +798,6 @@ Lemma process_PrepareQC_non_last_block_set_eq : forall s msg s' lm,
  honest_node (node_id s) ->
  get_message_type msg = PrepareQC ->
  view_valid s msg ->
- timeout s = false ->
  ~ last_block (get_block msg) ->
  (process_PrepareQC_non_last_block_set s msg = (s', lm) <->
    process_PrepareQC_non_last_block s msg s' lm).

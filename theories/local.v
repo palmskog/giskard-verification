@@ -713,7 +713,6 @@ Definition process_PrepareQC_non_last_block (s : NState) (msg : message) (s' : N
   honest_node (node_id s) /\ 
   get_message_type msg = PrepareQC /\ 
   view_valid s msg /\
-  timeout s = false /\ 
   ~ last_block (get_block msg).
 
 (** *** ViewChange message-related actions *)
