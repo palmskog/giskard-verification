@@ -327,11 +327,8 @@ Definition process_ViewChange_pre_quorum_set (s : NState) (msg : message)
 
 Definition process_ViewChangeQC_single_set (s : NState) (msg : message)
  : NState * list message :=
- let msg' :=
-   mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock
- in
  let s' := s
-  <| counting_messages := msg :: msg' :: s.(counting_messages) |>
+  <| counting_messages := msg :: s.(counting_messages) |>
   <| node_view := S (node_view s) |>
   <| in_messages := [] |>
   <| timeout := false |>
@@ -900,7 +897,6 @@ Qed.
 
 Lemma process_ViewChangeQC_single_set_eq : forall s msg s' lm,
  received s msg ->
- received s (mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock) ->
  honest_node (node_id s) ->
  get_message_type msg = ViewChangeQC ->
  view_valid s msg ->

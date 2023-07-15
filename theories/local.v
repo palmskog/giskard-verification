@@ -642,38 +642,6 @@ Definition prepare_qc_already_sent (s : NState) (b : block) : bool :=
 
 (** Block is about to reach QC - send PrepareVote messages for child block if it exists and send PrepareQC: *)
 (* vote_quorum means quorum PrepareVote messages *)
-(*
-    @staticmethod
-    def process_PrepareVote_vote(state: NState, msg: GiskardMessage,
-                                 state_prime: NState, lm: List[GiskardMessage], node, block_cache, peers) -> bool:
-        """ Block is about to reach QC - send PrepareVote messages for child block if it exists and send PrepareQC
-        vote_quorum means quorum PrepareVote messages """
-        """ CHANGE from the original specification
-        it only makes sense here to check if there is a same height block
-        for the prepareVote msgs that we will be sending out """
-        """ CHANGE from the original specification
-        checking for prepareQC already sent, to avoid too many messages """
-        # TODO is checking in the out_messages enough with exists_same_height_block ?
-        lm_prime = []
-        if not Giskard.prepare_qc_already_sent(state, msg.block):
-            lm_prime.append(Giskard.make_PrepareQC(state, msg))
-        lm_prime = lm_prime + Giskard.pending_PrepareVote(state, msg, block_cache)
-        for m in lm_prime:
-            if m.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_VOTE:
-                if Giskard.exists_same_height_block(state, m.block):
-                    return False
-        return state_prime == \
-            Giskard.process(Giskard.record_plural(
-                state, lm_prime),
-                msg) \
-            and lm == lm_prime \
-            and Giskard.received(state, msg) \
-            and Giskard.honest_node(node) \
-            and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_VOTE \
-            and Giskard.view_valid(state, msg) \
-            and not state.timeout \
-            and Giskard.vote_quorum_in_view(Giskard.process(state, msg), msg.view, msg.block, peers)
-*)
 Definition process_PrepareVote_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
   let lm_prime :=
     if negb (prepare_qc_already_sent s (get_block msg)) then
@@ -1078,11 +1046,9 @@ is processed before view change occurs, otherwise nodes can get stuck during vie
             and Giskard.view_valid(state, msg)
 *)
 Definition process_ViewChangeQC_single (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
-  s' = increment_view (process (process s
-    (mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock)) msg) /\
+  s' = increment_view (process s msg) /\
   lm = [] /\
   received s msg /\
-  received s (mkMessage PrepareQC (node_view s) (get_sender msg) (get_block msg) GenesisBlock) /\
   honest_node (node_id s) /\ 
   get_message_type msg = ViewChangeQC /\ 
   view_valid s msg.
