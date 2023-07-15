@@ -1104,6 +1104,31 @@ Definition malicious_ignore (s : NState) (msg : message) (s' : NState) (lm : lis
   received s msg /\
   ~ honest_node (node_id s).
 
+(*
+    @staticmethod
+    def pending_PrepareVote_malicious(state: NState, quorum_msg: GiskardMessage, block_cache) -> List[GiskardMessage]:
+        """ Extra function, as original specification would not maliciously vote for a block,
+        as the original pending_PrepareVote checks for exists_same_height_block """
+        """ CHANGE from the original specification
+        here do I check for if a prepare vote has been already sent,
+        this check is nowhere to be found in the coq code"""
+        """ CHANGE from the original specification
+        lambda msg: msg.view == quorum_msg.view removed, why is that there makes no sense,
+        hinders voting for the first block of a new view"""
+        return list(map(lambda prepare_block_msg:
+                        Giskard.make_PrepareVote(state, quorum_msg, prepare_block_msg),
+                        filter(lambda msg: Giskard.parent_ofb(msg.block, quorum_msg.block, block_cache)
+                                           and msg.message_type == GiskardMessage.CONSENSUS_GISKARD_PREPARE_BLOCK
+                                           and not Giskard.prepare_vote_already_sent(state, msg.block),
+                              state.counting_messages)))
+*)
+Definition pending_PrepareVote_malicious (s : NState) (quorum_msg : message) : list message :=
+ map (fun prepare_block_msg => make_PrepareVote s quorum_msg prepare_block_msg)
+     (filter (fun msg => parent_ofb (get_block msg) (get_block quorum_msg) &&
+                      message_type_eqb (get_message_type msg) PrepareBlock &&
+                      negb (prepare_vote_already_sent s (get_block msg)))
+             (counting_messages s)).
+
 (** Malicious nodes can double vote for two blocks of the same height: *)
 (*
     @staticmethod
@@ -1135,8 +1160,9 @@ Definition malicious_ignore (s : NState) (msg : message) (s' : NState) (lm : lis
             and Giskard.exists_same_height_block(state, msg.block)
 *)
 Definition process_PrepareBlock_malicious_vote (s : NState) (msg : message) (s' : NState) (lm : list message) : Prop :=
-  s' = record_plural (process s msg) (pending_PrepareVote s msg) /\
-  lm = pending_PrepareVote s msg /\
+  exists quorum_msg, quorum_msg_for_block s (parent_of (get_block msg)) quorum_msg /\
+  s' = record_plural (process s msg) (pending_PrepareVote_malicious (process s msg) quorum_msg) /\
+  lm = pending_PrepareVote_malicious (process s msg) quorum_msg /\
   received s msg /\
   ~ honest_node (node_id s) /\ 
   get_message_type msg = PrepareBlock /\ 
@@ -1240,6 +1266,9 @@ Proof.
   - destruct H_step as [? [_ [H_subst _]]].
     rewrite H_subst in *; simpl.
     right; assumption.
+  - destruct H_step as [? [_ [H_subst _]]].
+    rewrite H_subst in *; simpl.
+    right; assumption.
 Qed.
 
 Lemma counting_messages_local_monotonic :
@@ -1268,6 +1297,10 @@ Proof.
     right; assumption.
   - clear H_subst.
     destruct H_step_copy as [_ [H_subst _]].
+    rewrite H_subst; simpl.
+    right; assumption.
+  - clear H_subst.
+    destruct H_step_copy as [? [_ [H_subst _]]].
     rewrite H_subst; simpl.
     right; assumption.
   - clear H_subst.
@@ -1312,6 +1345,10 @@ Proof.
     rewrite H_out in H_in.
     simpl in *.
     destruct H_in as [H_in | [H_in | [H_in | H_in]]]; tauto.
+  - clear H_update H_out; destruct H_step_copy as [? [_ [H_update [H_out _]]]].
+    rewrite H_update; simpl.
+    rewrite H_out in H_in.
+    apply in_app_iff; left; assumption.
 Qed.
 
 Lemma not_prepare_stage :
